@@ -634,6 +634,7 @@ def list_all_transactions(limit: int = Query(default=100, le=500)):
 # ==============================================================================
 
 @app.get("/api/cloud/supabase/status", response_model=SupabaseHealthResponse, tags=["Supabase Cloud Lead"])
+@app.get("/api/supabase/status", response_model=SupabaseHealthResponse, tags=["Supabase Cloud Lead"])
 def get_supabase_cloud_status():
     """
     Returns the live status of the Supabase Cloud REST and PostgREST connection,

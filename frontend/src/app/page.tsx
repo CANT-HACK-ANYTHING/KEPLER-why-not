@@ -209,6 +209,196 @@ const initialStations: Station[] = [
     coords: { x: 22, y: 45 },
     hardwareNote: "Subsidized farm community tariff with solar canopy",
   },
+  {
+    id: "node_esp32_11",
+    name: "Arcot Royal Palace Tap",
+    host: "Nawaz Basha (Arcot Sweets Corner)",
+    place: "Palace Road, Near Arcot Clock Tower",
+    power: "3.3 kW",
+    rate: 10.50,
+    baseRate: 10.50,
+    gridAvailability: "NORMAL",
+    powerSource: "GRID",
+    tariffReason: "Standard Municipal Grid Tariff",
+    status: "Available",
+    initials: "AP",
+    color: "mint",
+    latitude: 12.9042,
+    longitude: 79.3326,
+    coords: { x: 74, y: 55 },
+    hardwareNote: "Town center sweet stall tap with shaded e-bike parking",
+  },
+  {
+    id: "node_esp32_12",
+    name: "Vaniyambadi Biryani Expressway Stop",
+    host: "Farooq Hospitality & EV Point",
+    place: "Chennai-Bengaluru Highway, Vaniyambadi Toll",
+    power: "7.4 kW",
+    rate: 10.80,
+    baseRate: 13.50,
+    gridAvailability: "SURPLUS",
+    powerSource: "SOLAR",
+    tariffReason: "High-Capacity Highway Solar Canopy (20% Off)",
+    status: "Available",
+    initials: "VB",
+    color: "peach",
+    latitude: 12.6830,
+    longitude: 78.6180,
+    coords: { x: 8, y: 95 },
+    hardwareNote: "Express highway dual 32A charging with 24h restaurant",
+  },
+  {
+    id: "node_esp32_13",
+    name: "Pallikonda Toll Plaza Safe Rest",
+    host: "Senguttuvan Highway Lodge",
+    place: "NH-48 KM 126, Pallikonda Service Road",
+    power: "3.3 kW",
+    rate: 14.40,
+    baseRate: 12.00,
+    gridAvailability: "BATTERY",
+    powerSource: "HYBRID",
+    tariffReason: "Highway Heavy Inverter Storage Relay (+20%)",
+    status: "Available",
+    initials: "PT",
+    color: "blue",
+    latitude: 12.9090,
+    longitude: 78.9660,
+    coords: { x: 30, y: 62 },
+    hardwareNote: "Quiet night parking with 16A industrial plug socket",
+  },
+  {
+    id: "node_esp32_14",
+    name: "Melvisharam Tannery Eco-Charge",
+    host: "Tariq Leather Works & Green Power",
+    place: "Trunk Road, Melvisharam Industrial Area",
+    power: "3.3 kW",
+    rate: 15.53,
+    baseRate: 11.50,
+    gridAvailability: "STRAINED",
+    powerSource: "GRID",
+    tariffReason: "Industrial Feeder Peak Strain (+35%)",
+    status: "Available",
+    initials: "MT",
+    color: "emerald",
+    latitude: 12.9350,
+    longitude: 79.2480,
+    coords: { x: 62, y: 46 },
+    hardwareNote: "Secured yard with surge protector & fire safety buffer",
+  },
+  {
+    id: "node_esp32_15",
+    name: "Tiruvallam Bridge River Tap",
+    host: "Selvam Coconut Grove & Charging",
+    place: "Ponnai Road Junction, Tiruvallam",
+    power: "3.3 kW",
+    rate: 7.20,
+    baseRate: 9.00,
+    gridAvailability: "SURPLUS",
+    powerSource: "SOLAR",
+    tariffReason: "Riverbed Farm Solar Array Discount (20% Off)",
+    status: "Available",
+    initials: "TB",
+    color: "mint",
+    latitude: 12.9960,
+    longitude: 79.2230,
+    coords: { x: 58, y: 22 },
+    hardwareNote: "Shaded coconut orchard parking with cool breeze & water",
+  },
+  {
+    id: "node_esp32_16",
+    name: "Sathuvachari Expressway Transit",
+    host: "Ramesh Babu Express Laundry",
+    place: "Near Collectorate Office, Sathuvachari",
+    power: "3.3 kW",
+    rate: 10.00,
+    baseRate: 10.00,
+    gridAvailability: "NORMAL",
+    powerSource: "GRID",
+    tariffReason: "District HQ Stable Municipal Feeder",
+    status: "Available",
+    initials: "SE",
+    color: "blue",
+    latitude: 12.9380,
+    longitude: 79.1650,
+    coords: { x: 52, y: 45 },
+    hardwareNote: "Convenient urban node near govt offices & commercial banks",
+  },
+  {
+    id: "node_esp32_17",
+    name: "VIT Lake Back-Gate Eco-Tap",
+    host: "Student Tech Innovators Co-op",
+    place: "Behind VIT Lake, Kangeyanallur Road",
+    power: "3.3 kW",
+    rate: 6.40,
+    baseRate: 8.00,
+    gridAvailability: "SURPLUS",
+    powerSource: "SOLAR",
+    tariffReason: "Campus Micro-Grid Student Research Subsidy (-20%)",
+    status: "Available",
+    initials: "VL",
+    color: "emerald",
+    latitude: 12.9730,
+    longitude: 79.1620,
+    coords: { x: 51, y: 34 },
+    hardwareNote: "IoT PZEM telemetry node with experimental solar tracker",
+  },
+  {
+    id: "node_esp32_18",
+    name: "Vellore Old Town Bazaar Point",
+    host: "Mustafa Merchant Union",
+    place: "Main Bazaar Road, Near Long Bazaar",
+    power: "3.3 kW",
+    rate: 16.88,
+    baseRate: 12.50,
+    gridAvailability: "STRAINED",
+    powerSource: "GRID",
+    tariffReason: "Dense Market Evening Peak Congestion (+35%)",
+    status: "Available",
+    initials: "VO",
+    color: "peach",
+    latitude: 12.9150,
+    longitude: 79.1300,
+    coords: { x: 45, y: 56 },
+    hardwareNote: "Heavy traffic commercial corridor with delivery 3W bay",
+  },
+  {
+    id: "node_esp32_19",
+    name: "Otteri Lake Nature Park Relay",
+    host: "Green Valley Eco Resort",
+    place: "Otteri Circular Road, Southern Foothills",
+    power: "7.2 kW",
+    rate: 10.00,
+    baseRate: 10.00,
+    gridAvailability: "NORMAL",
+    powerSource: "HYBRID",
+    tariffReason: "Stable Green Buffer Zone Baseline",
+    status: "Available",
+    initials: "OL",
+    color: "mint",
+    latitude: 12.8870,
+    longitude: 79.1240,
+    coords: { x: 44, y: 72 },
+    hardwareNote: "Dual fast AC charging bay surrounded by nature walking trail",
+  },
+  {
+    id: "node_esp32_20",
+    name: "Arakkonam Rail Hub Inter-Connect",
+    host: "Murthy Transport Logistics",
+    place: "Station Road, Arakkonam Junction Feeder",
+    power: "7.4 kW",
+    rate: 13.20,
+    baseRate: 11.00,
+    gridAvailability: "BATTERY",
+    powerSource: "BATTERY_BACKUP",
+    tariffReason: "Railway Substation Battery Inverter Bank (+20%)",
+    status: "Available",
+    initials: "AR",
+    color: "blue",
+    latitude: 13.0800,
+    longitude: 79.6700,
+    coords: { x: 96, y: 12 },
+    hardwareNote: "High-capacity railway interchange buffer for 2W/3W fleets",
+  },
 ];
 
 export default function Home() {
@@ -279,7 +469,7 @@ export default function Home() {
               latitude: n.latitude || preset.latitude,
               longitude: n.longitude || preset.longitude,
               coords: preset.coords,
-              hardwareNote: preset.hardwareNote,
+              hardwareNote: n.hardware_note || preset.hardwareNote,
             };
           });
           setStations(merged);
@@ -396,14 +586,14 @@ export default function Home() {
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-xs uppercase tracking-wider font-bold text-emerald-400">
-                Offline-First P2P Mesh • Dynamic Grid Tariffs Active
+                Offline-First P2P Mesh • Supabase Realtime Connected
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Vellore EV Mesh Network
             </h1>
             <p className="text-sm text-slate-400 mt-0.5">
-              10 verified decentralized charging stations with live dynamic grid power availability tariffs.
+              20 verified decentralized charging stations operating with dynamic grid power tariffs.
             </p>
           </div>
 
@@ -420,7 +610,7 @@ export default function Home() {
               href="/map"
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-900/40 transition"
             >
-              <span>🗺️ Hex Map (10)</span>
+              <span>🗺️ Hex Map (20)</span>
               <span>↗</span>
             </Link>
           </div>
@@ -461,15 +651,15 @@ export default function Home() {
             <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-slate-700/60 text-xs">
               <div>
                 <span className="text-slate-400 block text-[11px]">Nodes In Range</span>
-                <span className="font-bold text-white text-sm">10 Stations</span>
+                <span className="font-bold text-white text-sm">20 Stations</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[11px]">Dynamic Grid Rates</span>
-                <span className="font-bold text-emerald-400 text-sm">₹6.80 - ₹17.55</span>
+                <span className="font-bold text-emerald-400 text-sm">₹6.40 - ₹17.55</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[11px]">Simulated BLE</span>
-                <span className="font-bold text-emerald-400 text-sm">ESP32 Ready</span>
+                <span className="text-slate-400 block text-[11px]">Macro Hex Clusters</span>
+                <span className="font-bold text-emerald-400 text-sm">3 Regional Sectors</span>
               </div>
             </div>
           </div>
@@ -480,14 +670,14 @@ export default function Home() {
               <div className="flex items-center justify-between text-xs font-bold text-slate-400 mb-2">
                 <span>INTERACTIVE HEX MAP</span>
                 <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px]">
-                  10 LOCATIONS
+                  20 LOCATIONS
                 </span>
               </div>
               <h3 className="text-base font-bold text-white mb-1.5">
                 Full Corridor Spatial Discovery
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Leaflet map indexing Katpadi, VIT, Sripuram, Vellore Fort, Bagayam, Ranipet, Ambur, Sholinghur, Walajah, and Gudiyatham.
+                Leaflet map indexing Katpadi, VIT, Sripuram, Fort, Bagayam, Ranipet, Ambur, Sholinghur, Walajah, Gudiyatham, Arcot, Vaniyambadi, Pallikonda, and Arakkonam.
               </p>
             </div>
 
@@ -496,7 +686,7 @@ export default function Home() {
                 href="/map"
                 className="w-full text-center bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-2.5 rounded-xl border border-slate-600 transition flex items-center justify-center gap-2"
               >
-                <span>🗺️ Open Full Hex Map</span>
+                <span>🗺️ Open Full Hex Map (20)</span>
                 <span>→</span>
               </Link>
               <button
@@ -517,7 +707,7 @@ export default function Home() {
             </span>
             <input
               type="text"
-              placeholder="Search by place (VIT, Katpadi, Sripuram, Fort, Ranipet, Ambur)..."
+              placeholder="Search 20 stations (VIT, Katpadi, Sripuram, Arcot, Ambur, Vaniyambadi)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-900 border border-slate-700 text-white placeholder-slate-500 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-emerald-500 transition"
@@ -560,12 +750,12 @@ export default function Home() {
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Tariffs adjust dynamically based on local solar generation and grid strain.
+              Live power tariffs updated dynamically based on solar generation, battery backup, and grid load.
             </p>
           </div>
         </div>
 
-        {/* Station Grid (10 Real Vellore Locations) */}
+        {/* Station Grid (20 Verified Locations) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {displayedStations.map((st) => {
             const distanceKm = calculateDistanceKm(driverCoords, {

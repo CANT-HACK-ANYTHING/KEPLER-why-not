@@ -1,13 +1,6 @@
 // Multi-Tier Hexagonal Spatial Mapping Engine for RelayEV Offline Mesh Networks
 // Implements Hierarchical Macro (Tier 1) and Micro (Tier 2) Hexagonal Spatial Grids
 
-export interface HexCellInfo {
-  cellId: string;
-  ring: number;
-  ringLabel: string;
-  distanceKm: number;
-}
-
 export interface MacroHexSector {
   id: string;
   code: string;
@@ -19,7 +12,7 @@ export interface MacroHexSector {
   stationIds: string[];
 }
 
-// Pre-defined Macro Hexagonal Sectors (Tier 1 - Regional Clusters)
+// Pre-defined Macro Hexagonal Sectors (Tier 1 - Regional Clusters covering 20 Stations)
 export const MACRO_HEX_SECTORS: MacroHexSector[] = [
   {
     id: 'macro_sector_vlr_central',
@@ -27,7 +20,7 @@ export const MACRO_HEX_SECTORS: MacroHexSector[] = [
     name: 'Vellore Urban & Educational Core',
     centerLat: 12.9250,
     centerLng: 79.1350,
-    radiusKm: 12.0,
+    radiusKm: 14.0,
     color: '#06b6d4', // Cyan
     stationIds: [
       'node_esp32_01', // VIT Campus Solar Relay
@@ -35,6 +28,10 @@ export const MACRO_HEX_SECTORS: MacroHexSector[] = [
       'node_esp32_03', // Sripuram Golden Temple Hub
       'node_esp32_04', // Vellore Fort Heritage Tap
       'node_esp32_05', // Bagayam Rural Clean Hub
+      'node_esp32_16', // Sathuvachari Expressway Transit
+      'node_esp32_17', // VIT Lake Back-Gate Eco-Tap
+      'node_esp32_18', // Vellore Old Town Bazaar Point
+      'node_esp32_19', // Otteri Lake Nature Park Relay
     ],
   },
   {
@@ -42,15 +39,32 @@ export const MACRO_HEX_SECTORS: MacroHexSector[] = [
     code: 'HEX-MACRO-CORRIDOR02',
     name: 'Highway & Rural Feeder Corridor',
     centerLat: 12.9400,
-    centerLng: 79.1500,
-    radiusKm: 55.0,
+    centerLng: 79.2500,
+    radiusKm: 45.0,
     color: '#8b5cf6', // Violet
     stationIds: [
       'node_esp32_06', // Ranipet Industrial Corridor Relay
-      'node_esp32_07', // Ambur Leather Town Node
       'node_esp32_08', // Sholinghur Hill Temple Relay
       'node_esp32_09', // Walajah Highway Toll Dhaba
       'node_esp32_10', // Gudiyatham Agricultural Feeder
+      'node_esp32_11', // Arcot Royal Palace Tap
+      'node_esp32_14', // Melvisharam Tannery Eco-Charge
+      'node_esp32_15', // Tiruvallam Bridge River Tap
+    ],
+  },
+  {
+    id: 'macro_sector_vlr_express',
+    code: 'HEX-MACRO-EXPRESS03',
+    name: 'Expressway Inter-District Mesh',
+    centerLat: 12.8500,
+    centerLng: 79.0000,
+    radiusKm: 75.0,
+    color: '#10b981', // Emerald
+    stationIds: [
+      'node_esp32_07', // Ambur Leather Town Node
+      'node_esp32_12', // Vaniyambadi Biryani Expressway Stop
+      'node_esp32_13', // Pallikonda Toll Plaza Safe Rest
+      'node_esp32_20', // Arakkonam Rail Hub Inter-Connect
     ],
   },
 ];

@@ -23,6 +23,9 @@ class Settings(BaseModel):
     # Maximum clock skew allowed for offline ESP32 receipts (in seconds: 24 hours)
     MAX_CLOCK_SKEW_SECONDS: int = int(os.getenv("MAX_CLOCK_SKEW_SECONDS", "86400"))
     
+    # Database Configuration
+    DATABASE_PATH: str = os.getenv("DATABASE_PATH", "relay_ev.db")
+
     # Supabase Credentials (optional - falls back to built-in SQLite database if omitted)
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")

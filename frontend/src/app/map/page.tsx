@@ -77,7 +77,7 @@ function MapLoadingSkeleton() {
         <div className="space-y-1.5 text-[11px] font-mono text-left bg-neutral-900/90 border border-neutral-800 rounded-2xl p-3.5 shadow-xl">
           <div className="flex items-center gap-2 text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span>✓ 6 Rural Ports Ready</span>
+            <span>✓ 20 Regional Ports Ready</span>
           </div>
           <div className={`flex items-center gap-2 transition-opacity duration-300 ${loadStep >= 2 ? 'text-emerald-400' : 'text-neutral-500'}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${loadStep >= 2 ? 'bg-emerald-400' : 'bg-neutral-600'}`} />

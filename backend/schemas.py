@@ -54,6 +54,9 @@ class NodeOut(BaseModel):
     host_wallet_balance: float
     is_active: bool
     firmware_version: str
+    coverage_radius_km: Optional[float] = 2.5
+    hex_cell_id: Optional[str] = '87602816BFFFFFF'
+    hardware_note: Optional[str] = None
 
 class GridStatusUpdateRequest(BaseModel):
     grid_availability: str = Field(..., description="Power availability: SURPLUS, NORMAL, STRAINED, or BATTERY")
