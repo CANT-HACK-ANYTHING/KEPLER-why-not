@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="relayGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="50%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#34d399" />
+    </linearGradient>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Rounded Rect -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGradient)" />
+
+  <!-- Outer Mesh Orbit Ring -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#10b981" stroke-width="6" stroke-dasharray="16 12" opacity="0.4" />
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#34d399" stroke-width="4" stroke-dasharray="8 8" opacity="0.6" />
+
+  <!-- Mesh Orbiting Nodes -->
+  <circle cx="130" cy="180" r="14" fill="#34d399" filter="url(#glow)" />
+  <circle cx="382" cy="180" r="14" fill="#10b981" filter="url(#glow)" />
+  <circle cx="256" cy="436" r="16" fill="#059669" filter="url(#glow)" />
+
+  <!-- Connecting Mesh Radii Lines -->
+  <line x1="256" y1="256" x2="130" y2="180" stroke="#10b981" stroke-width="3" opacity="0.5" />
+  <line x1="256" y1="256" x2="382" y2="180" stroke="#10b981" stroke-width="3" opacity="0.5" />
+  <line x1="256" y1="256" x2="256" y2="436" stroke="#10b981" stroke-width="3" opacity="0.5" />
+
+  <!-- Central Hexagon Base -->
+  <polygon points="256,150 348,203 348,309 256,362 164,309 164,203" fill="#047857" opacity="0.3" stroke="#10b981" stroke-width="4" />
+
+  <!-- Central Electric Lightning Bolt (Relay Power) -->
+  <path d="M 276 160 L 206 270 L 260 270 L 236 352 L 316 238 L 264 238 Z"
+        fill="url(#relayGradient)"
+        filter="url(#glow)" />
+
+  <!-- Bluetooth Antenna Waves Symbol (P2P Mesh) -->
+  <path d="M 320 230 Q 340 256 320 282" fill="none" stroke="#6ee7b7" stroke-width="5" stroke-linecap="round" />
+  <path d="M 338 215 Q 368 256 338 297" fill="none" stroke="#a7f3d0" stroke-width="4" stroke-linecap="round" opacity="0.8" />
+</svg>

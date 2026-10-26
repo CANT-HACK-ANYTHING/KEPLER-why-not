@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ChargingReceipt } from "@/types/ble";
 import { BleConnector } from "./BleConnector";
 import { BleSimulator } from "./BleSimulator";
+import { OfflineMeshStorage } from "@/lib/offlineMeshStorage";
 
 interface ChargingSessionManagerProps {
   initialNodeId?: string;
@@ -144,6 +145,9 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
       const actual = receipt.actual_cost;
       const refund = Math.max(0, +(escrowAmount - actual).toFixed(2));
       const newBal = +(walletBalance + refund).toFixed(2);
+
+      // Save receipt to offline queue for automatic cloud sync when network resumes
+      OfflineMeshStorage.enqueueOfflineReceipt(receipt);
       setSettlementData({
         session_id: receipt.session_id,
         status: "SETTLED (OFFLINE CACHED)",

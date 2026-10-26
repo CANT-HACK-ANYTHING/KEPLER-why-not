@@ -20,7 +20,7 @@ interface Station {
 const stations: Station[] = [
   {
     id: "RelayEV-Node-01",
-    name: "Mohan’s Courtyard",
+    name: "Mohan's Courtyard",
     host: "Mohan Ram (Solar + PZEM)",
     place: "Rampur village · 0.8 km",
     power: "3.2 kW",
@@ -32,7 +32,7 @@ const stations: Station[] = [
   },
   {
     id: "RelayEV-Node-02",
-    name: "Kavita’s Farmhouse",
+    name: "Kavita's Farmhouse",
     host: "Kavita Devi (30A Relay)",
     place: "Old highway · 2.4 km",
     power: "2.8 kW",
