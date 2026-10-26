@@ -12,6 +12,10 @@ export interface Station extends NavStation {
   color: "mint" | "peach" | "blue" | "emerald";
   coords: { x: number; y: number };
   hardwareNote?: string;
+  baseRate?: number;
+  gridAvailability?: "SURPLUS" | "NORMAL" | "STRAINED" | "BATTERY" | string;
+  powerSource?: string;
+  tariffReason?: string;
 }
 
 const initialStations: Station[] = [
@@ -21,7 +25,11 @@ const initialStations: Station[] = [
     host: "Rajesh Kumar (VIT Solar Grid)",
     place: "Near VIT Main Gate, Tiruvalam Road, Katpadi",
     power: "3.3 kW",
-    rate: 10.00,
+    rate: 8.00,
+    baseRate: 10.00,
+    gridAvailability: "SURPLUS",
+    powerSource: "SOLAR",
+    tariffReason: "Surplus Green Solar / Off-Peak (20% Discount)",
     status: "Available",
     initials: "VC",
     color: "mint",
@@ -37,6 +45,10 @@ const initialStations: Station[] = [
     place: "Near Katpadi Railway Station, NH-46",
     power: "3.3 kW",
     rate: 12.50,
+    baseRate: 12.50,
+    gridAvailability: "NORMAL",
+    powerSource: "GRID",
+    tariffReason: "Standard Grid Power Availability",
     status: "Available",
     initials: "KJ",
     color: "blue",
@@ -51,7 +63,11 @@ const initialStations: Station[] = [
     host: "Lakshmi Narayani Trust",
     place: "Malaikodi, Sripuram Temple Road",
     power: "7.2 kW",
-    rate: 8.50,
+    rate: 6.80,
+    baseRate: 8.50,
+    gridAvailability: "SURPLUS",
+    powerSource: "SOLAR",
+    tariffReason: "Solar Pilgrim Trust Subsidy (20% Off)",
     status: "Available",
     initials: "SG",
     color: "peach",
@@ -67,6 +83,10 @@ const initialStations: Station[] = [
     place: "Opp. Vellore Fort East Gate, Anna Salai",
     power: "3.3 kW",
     rate: 11.00,
+    baseRate: 11.00,
+    gridAvailability: "NORMAL",
+    powerSource: "GRID",
+    tariffReason: "Standard City Grid Availability",
     status: "Available",
     initials: "VF",
     color: "emerald",
@@ -81,7 +101,11 @@ const initialStations: Station[] = [
     host: "Dr. Anand Green Energy",
     place: "Near CMC Bagayam Campus, College Hill",
     power: "3.3 kW",
-    rate: 9.50,
+    rate: 7.60,
+    baseRate: 9.50,
+    gridAvailability: "SURPLUS",
+    powerSource: "SOLAR",
+    tariffReason: "Clean Campus Micro-Grid Solar (20% Off)",
     status: "Available",
     initials: "BR",
     color: "mint",
@@ -96,7 +120,11 @@ const initialStations: Station[] = [
     host: "Ranipet Fleet Co-op",
     place: "SIPCOT Phase 1, Chennai Highway, Ranipet",
     power: "7.4 kW",
-    rate: 13.00,
+    rate: 17.55,
+    baseRate: 13.00,
+    gridAvailability: "STRAINED",
+    powerSource: "GRID",
+    tariffReason: "SIPCOT Industrial Peak Load Surge (+35%)",
     status: "Available",
     initials: "RI",
     color: "blue",
@@ -111,7 +139,11 @@ const initialStations: Station[] = [
     host: "Ismail Leather Works",
     place: "NH-48 Bypass, Near Star Biryani, Ambur",
     power: "3.3 kW",
-    rate: 12.00,
+    rate: 14.40,
+    baseRate: 12.00,
+    gridAvailability: "BATTERY",
+    powerSource: "HYBRID",
+    tariffReason: "Highway Battery Backup Inverter (+20%)",
     status: "Available",
     initials: "AL",
     color: "peach",
@@ -126,7 +158,11 @@ const initialStations: Station[] = [
     host: "Govindarajan Temple Inn",
     place: "Foot of Yoga Narasimha Swamy Hill, Sholinghur",
     power: "3.3 kW",
-    rate: 10.50,
+    rate: 14.18,
+    baseRate: 10.50,
+    gridAvailability: "STRAINED",
+    powerSource: "GRID",
+    tariffReason: "Hill Route Peak Grid Strain (+35%)",
     status: "Available",
     initials: "SH",
     color: "emerald",
@@ -141,7 +177,11 @@ const initialStations: Station[] = [
     host: "Highway King Dhaba Tap",
     place: "NH-48 Toll Plaza Corridor, Walajapet",
     power: "7.2 kW",
-    rate: 14.00,
+    rate: 16.80,
+    baseRate: 14.00,
+    gridAvailability: "BATTERY",
+    powerSource: "HYBRID",
+    tariffReason: "Toll Plaza High-Power Inverter Storage (+20%)",
     status: "Available",
     initials: "WH",
     color: "mint",
@@ -156,7 +196,11 @@ const initialStations: Station[] = [
     host: "Venkatesan Agro Solar",
     place: "Agricultural Market Yard, Gudiyatham Bypass",
     power: "3.3 kW",
-    rate: 9.00,
+    rate: 7.20,
+    baseRate: 9.00,
+    gridAvailability: "SURPLUS",
+    powerSource: "SOLAR",
+    tariffReason: "Agro Solar Cooperative Surplus (20% Off)",
     status: "Available",
     initials: "GA",
     color: "blue",
@@ -178,7 +222,7 @@ export default function Home() {
 
   // Filtering & Search States
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [filterType, setFilterType] = useState<"ALL" | "CHEAP" | "FAST" | "NEAREST">("ALL");
+  const [filterType, setFilterType] = useState<"ALL" | "SURPLUS" | "CHEAP" | "FAST" | "NEAREST">("ALL");
 
   // Modals
   const [isTopupOpen, setIsTopupOpen] = useState<boolean>(false);
@@ -209,13 +253,21 @@ export default function Home() {
         if (data.length > 0) {
           const merged: Station[] = data.map((n: any) => {
             const preset = initialStations.find((s) => s.id === n.id) || initialStations[0];
+            const effectiveRate = n.effective_rate_per_kwh ?? n.rate_per_kwh ?? preset.rate;
+            const baseRate = n.base_rate_per_kwh ?? preset.baseRate ?? preset.rate;
+            const gridAvail = (n.grid_availability || preset.gridAvailability || "NORMAL").toUpperCase();
+            const tariffReason = n.tariff_reason || preset.tariffReason || "Standard Grid Availability";
             return {
               id: n.id,
               name: n.name,
               host: n.host_name,
               place: n.location,
               power: `${n.max_power_kw || 3.3} kW`,
-              rate: n.rate_per_kwh,
+              rate: effectiveRate,
+              baseRate: baseRate,
+              gridAvailability: gridAvail,
+              powerSource: n.power_source || preset.powerSource || "GRID",
+              tariffReason: tariffReason,
               status: n.is_active ? "Available" : "Charging",
               initials: n.name
                 .split(" ")
@@ -282,7 +334,11 @@ export default function Home() {
     }
 
     // Filter Chips
-    if (filterType === "CHEAP") {
+    if (filterType === "SURPLUS") {
+      result = result.filter(
+        (st) => (st.gridAvailability?.toUpperCase() === "SURPLUS") || st.rate < 10.0
+      );
+    } else if (filterType === "CHEAP") {
       result = result.filter((st) => st.rate <= 10.0);
     } else if (filterType === "FAST") {
       result = result.filter((st) => parseFloat(st.power) >= 3.3);
@@ -340,14 +396,14 @@ export default function Home() {
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-xs uppercase tracking-wider font-bold text-emerald-400">
-                Offline-First P2P Mesh · Bluetooth Escrow Active
+                Offline-First P2P Mesh • Dynamic Grid Tariffs Active
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Vellore EV Mesh Network
             </h1>
             <p className="text-sm text-slate-400 mt-0.5">
-              10 verified decentralized charging stations operating with zero cellular SIM OPEX.
+              10 verified decentralized charging stations with live dynamic grid power availability tariffs.
             </p>
           </div>
 
@@ -387,9 +443,9 @@ export default function Home() {
                   <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-[10px]">
                     AR
                   </span>
-                  <span>Anaya Rao (EV Driver · user_88)</span>
+                  <span>Anaya Rao (EV Driver • user_88)</span>
                   <span className="text-slate-600">•</span>
-                  <span className="text-emerald-400 font-medium">✓ Cryptographically Secured</span>
+                  <span className="text-emerald-400 font-medium">✓ Dynamic Tariff Escrow Secured</span>
                 </div>
               </div>
 
@@ -408,8 +464,8 @@ export default function Home() {
                 <span className="font-bold text-white text-sm">10 Stations</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[11px]">Macro Hex Clusters</span>
-                <span className="font-bold text-white text-sm">2 Sectors (Tier 1)</span>
+                <span className="text-slate-400 block text-[11px]">Dynamic Grid Rates</span>
+                <span className="font-bold text-emerald-400 text-sm">₹6.80 - ₹17.55</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[11px]">Simulated BLE</span>
@@ -471,6 +527,7 @@ export default function Home() {
           <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
             {[
               { id: "ALL", label: `All (${stations.length})` },
+              { id: "SURPLUS", label: "🟢 Surplus Solar (<₹10)" },
               { id: "CHEAP", label: "Under ₹10 🏷️" },
               { id: "FAST", label: "Fast (3.3+ kW) ⚡" },
               { id: "NEAREST", label: "Nearest First 📍" },
@@ -503,7 +560,7 @@ export default function Home() {
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Click any station to connect over Web Bluetooth or get turn-by-turn navigation.
+              Tariffs adjust dynamically based on local solar generation and grid strain.
             </p>
           </div>
         </div>
@@ -524,7 +581,7 @@ export default function Home() {
               >
                 <div>
                   {/* Card Header: Node ID & Status */}
-                  <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2.5">
                       <div className="w-10 h-10 rounded-xl bg-slate-700/80 border border-slate-600 text-emerald-400 flex items-center justify-center font-black text-sm group-hover:scale-105 transition">
                         {st.initials}
@@ -548,6 +605,33 @@ export default function Home() {
                     </span>
                   </div>
 
+                  {/* Grid Power Availability Badge */}
+                  {st.gridAvailability && (
+                    <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                          st.gridAvailability === "SURPLUS"
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                            : st.gridAvailability === "STRAINED"
+                            ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                            : st.gridAvailability === "BATTERY"
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                            : "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                        }`}
+                      >
+                        {st.gridAvailability === "SURPLUS" && "🟢 Surplus Solar (-20%)"}
+                        {st.gridAvailability === "STRAINED" && "🔴 Grid Strain (+35%)"}
+                        {st.gridAvailability === "BATTERY" && "⚡ Battery Backup (+20%)"}
+                        {st.gridAvailability === "NORMAL" && "🟡 Normal Grid"}
+                      </span>
+                      {st.tariffReason && (
+                        <span className="text-[10px] text-slate-400 truncate max-w-[200px]" title={st.tariffReason}>
+                          {st.tariffReason}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Location Address */}
                   <div className="flex items-start gap-1.5 text-xs text-slate-300 mb-2">
                     <span className="text-slate-400 shrink-0">📍</span>
@@ -567,8 +651,13 @@ export default function Home() {
                   {/* Tariff & Power Strip */}
                   <div className="flex items-center justify-between pt-3 border-t border-slate-700/60 mb-3 text-xs">
                     <div>
-                      <span className="text-lg font-black text-white">₹{st.rate.toFixed(2)}</span>
-                      <span className="text-slate-400 text-[11px]"> / kWh</span>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-lg font-black text-white">₹{st.rate.toFixed(2)}</span>
+                        {st.baseRate && Math.abs(st.baseRate - st.rate) > 0.01 && (
+                          <span className="text-xs text-slate-500 line-through">₹{st.baseRate.toFixed(2)}</span>
+                        )}
+                        <span className="text-slate-400 text-[11px]"> / kWh</span>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">

@@ -10,6 +10,12 @@ export interface NavStation {
   place: string;
   power: string;
   rate: number;
+  baseRate?: number;
+  gridAvailability?: "SURPLUS" | "NORMAL" | "STRAINED" | "BATTERY" | string;
+  powerSource?: string;
+  tariffMultiplier?: number;
+  tariffReason?: string;
+  badgeColor?: string;
   latitude: number;
   longitude: number;
   initials: string;
@@ -116,6 +122,66 @@ export function RouteNavigationModal({
           </div>
         </div>
 
+        {/* Dynamic Grid Availability & Tariff Indicator */}
+        <div
+          style={{
+            marginBottom: "16px",
+            padding: "10px 14px",
+            borderRadius: "10px",
+            background:
+              station.gridAvailability === "SURPLUS"
+                ? "rgba(16, 185, 129, 0.12)"
+                : station.gridAvailability === "STRAINED"
+                ? "rgba(239, 68, 68, 0.12)"
+                : station.gridAvailability === "BATTERY"
+                ? "rgba(245, 158, 11, 0.12)"
+                : "rgba(59, 130, 246, 0.12)",
+            border: `1px solid ${
+              station.gridAvailability === "SURPLUS"
+                ? "rgba(16, 185, 129, 0.35)"
+                : station.gridAvailability === "STRAINED"
+                ? "rgba(239, 68, 68, 0.35)"
+                : station.gridAvailability === "BATTERY"
+                ? "rgba(245, 158, 11, 0.35)"
+                : "rgba(59, 130, 246, 0.35)"
+            }`,
+            fontSize: "12px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+            <span style={{ fontWeight: 700, color: "#e2e8f0" }}>⚡ Grid Power Availability:</span>
+            <span
+              style={{
+                fontWeight: 700,
+                color:
+                  station.gridAvailability === "SURPLUS"
+                    ? "#34d399"
+                    : station.gridAvailability === "STRAINED"
+                    ? "#f87171"
+                    : station.gridAvailability === "BATTERY"
+                    ? "#fbbf24"
+                    : "#60a5fa",
+              }}
+            >
+              {station.gridAvailability === "SURPLUS"
+                ? "🟢 High Solar Surplus (-20%)"
+                : station.gridAvailability === "STRAINED"
+                ? "🔴 Grid Strain Peak (+35%)"
+                : station.gridAvailability === "BATTERY"
+                ? "⚡ Inverter Battery Backup (+20%)"
+                : "🟡 Normal Grid Stable"}
+            </span>
+          </div>
+          <div style={{ fontSize: "11px", color: "#94a3b8" }}>
+            {station.tariffReason || `Dynamic rate adjusted for local power conditions.`}
+            {station.baseRate && station.baseRate !== station.rate && (
+              <span style={{ marginLeft: "6px", color: "#cbd5e1" }}>
+                (Base: ₹{station.baseRate.toFixed(2)} → Live: ₹{station.rate.toFixed(2)}/kWh)
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Location & Power Specs */}
         <div style={{ background: "rgba(15, 23, 42, 0.7)", borderRadius: "10px", padding: "12px", marginBottom: "16px", fontSize: "12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
@@ -127,8 +193,8 @@ export function RouteNavigationModal({
             <span style={{ fontWeight: 600, color: "#34d399" }}>⚡ {station.power} (30A Failsafe Relay)</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "#94a3b8" }}>Community Tariff:</span>
-            <span style={{ fontWeight: 600, color: "#f8fafc" }}>₹{station.rate.toFixed(2)} / kWh</span>
+            <span style={{ color: "#94a3b8" }}>Effective Live Tariff:</span>
+            <span style={{ fontWeight: 700, color: "#f8fafc" }}>₹{station.rate.toFixed(2)} / kWh</span>
           </div>
         </div>
 
@@ -140,62 +206,61 @@ export function RouteNavigationModal({
           </div>
           <input
             type="range"
-            min="2"
-            max="30"
-            step="1"
+            min={2}
+            max={30}
+            step={1}
             value={targetKwh}
-            onChange={(e) => setTargetKwh(parseInt(e.target.value) || 10)}
-            style={{ width: "100%", accentColor: "#10b981" }}
+            onChange={(e) => setTargetKwh(Number(e.target.value))}
+            style={{ width: "100%", accentColor: "#10b981", cursor: "pointer" }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#64748b", marginTop: "2px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
             <span>2 kWh (Scooter)</span>
             <span>Est. ~{chargeHours} hrs</span>
-            <span>30 kWh (Full EV Car)</span>
+            <span>30 kWh (Tata Nexon EV)</span>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {/* Navigation & Action Buttons */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
           <a
             href={googleMapsUrl}
             target="_blank"
             rel="noopener noreferrer"
             style={{
+              padding: "12px",
+              borderRadius: "10px",
+              background: "#334155",
+              color: "#f8fafc",
+              fontWeight: 700,
+              fontSize: "13px",
+              textAlign: "center",
+              textDecoration: "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "8px",
-              background: "#2563eb",
-              color: "#fff",
-              textDecoration: "none",
-              borderRadius: "10px",
-              padding: "12px",
-              fontSize: "14px",
-              fontWeight: 700,
-              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+              gap: "6px",
             }}
           >
-            🚗 Start GPS Navigation (Google Maps) ↗
+            🧭 Open Maps
           </a>
-
           <button
-            onClick={() => {
-              onClose();
-              onStartCharging(station);
-            }}
+            onClick={() => onStartCharging(station)}
             style={{
-              background: "linear-gradient(135deg, #10b981, #059669)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "10px",
               padding: "12px",
-              fontSize: "14px",
+              borderRadius: "10px",
+              background: "linear-gradient(135deg, #10b981, #059669)",
+              color: "#ffffff",
               fontWeight: 700,
+              fontSize: "13px",
+              border: "none",
               cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
             }}
           >
-            ⚡ Start Charging via Web Bluetooth
+            ⚡ Start Charging
           </button>
         </div>
       </div>

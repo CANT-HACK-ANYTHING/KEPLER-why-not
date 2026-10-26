@@ -27,7 +27,7 @@ def init_database():
     );
     """)
 
-    # 2. Nodes table
+    # 2. Nodes table (Zero-OPEX Offline Host Hardware with Grid-Aware Dynamic Tariffs)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS nodes (
         id TEXT PRIMARY KEY,
@@ -38,6 +38,10 @@ def init_database():
         latitude REAL DEFAULT 28.6140,
         longitude REAL DEFAULT 77.2090,
         rate_per_kwh REAL NOT NULL DEFAULT 10.00,
+        base_rate_per_kwh REAL NOT NULL DEFAULT 10.00,
+        grid_availability TEXT NOT NULL DEFAULT 'NORMAL',
+        power_source TEXT NOT NULL DEFAULT 'HYBRID',
+        dynamic_pricing_enabled INTEGER NOT NULL DEFAULT 1,
         max_power_kw REAL NOT NULL DEFAULT 3.30,
         host_wallet_balance REAL NOT NULL DEFAULT 0.00,
         hardware_secret TEXT NOT NULL,
@@ -46,6 +50,18 @@ def init_database():
         created_at TEXT NOT NULL
     );
     """)
+
+    # Seamless upgrades for existing database schemas
+    for col, col_def in [
+        ("base_rate_per_kwh", "REAL DEFAULT 10.00"),
+        ("grid_availability", "TEXT DEFAULT 'NORMAL'"),
+        ("power_source", "TEXT DEFAULT 'HYBRID'"),
+        ("dynamic_pricing_enabled", "INTEGER DEFAULT 1")
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE nodes ADD COLUMN {col} {col_def};")
+        except sqlite3.OperationalError:
+            pass
 
     # 3. Transactions table
     cursor.execute("""
@@ -143,6 +159,47 @@ def init_database():
 # Auto-initialize on module load
 init_database()
 
+
+def calculate_dynamic_tariff(node: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Computes grid-aware dynamic pricing based on power availability at the charging location:
+    - SURPLUS (Solar/Micro-hydro abundance): 20% Green Energy Discount (multiplier 0.80)
+    - NORMAL (Standard stable grid): 1.00x baseline tariff
+    - STRAINED (Peak hours / Low capacity feeder): 35% Peak Surge (multiplier 1.35)
+    - BATTERY (Inverter/Battery backup during blackout): 20% Storage Surcharge (multiplier 1.20)
+    """
+    base_rate = float(node.get("base_rate_per_kwh") or node.get("rate_per_kwh") or 10.0)
+    availability = str(node.get("grid_availability") or "NORMAL").upper()
+    power_source = str(node.get("power_source") or "HYBRID").upper()
+
+    if availability == "SURPLUS":
+        multiplier = 0.80
+        reason = "Surplus Green Solar / Off-Peak (20% Discount)"
+        badge_color = "green"
+    elif availability == "STRAINED":
+        multiplier = 1.35
+        reason = "Grid Peak Strain / Low Capacity (+35% Surge)"
+        badge_color = "red"
+    elif availability == "BATTERY":
+        multiplier = 1.20
+        reason = "Inverter Battery Storage Backup (+20%)"
+        badge_color = "amber"
+    else:
+        multiplier = 1.00
+        reason = "Standard Grid Availability"
+        badge_color = "blue"
+
+    effective_rate = round(base_rate * multiplier, 2)
+    return {
+        "base_rate_per_kwh": base_rate,
+        "effective_rate_per_kwh": effective_rate,
+        "grid_availability": availability,
+        "power_source": power_source,
+        "tariff_multiplier": multiplier,
+        "tariff_reason": reason,
+        "badge_color": badge_color
+    }
+
 class DatabaseManager:
     @staticmethod
     def get_connection():
@@ -205,7 +262,14 @@ class DatabaseManager:
         conn = DatabaseManager.get_connection()
         rows = conn.execute("SELECT * FROM nodes WHERE is_active = 1").fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+        result = []
+        for r in rows:
+            d = dict(r)
+            dyn = calculate_dynamic_tariff(d)
+            d.update(dyn)
+            d["rate_per_kwh"] = dyn["effective_rate_per_kwh"]
+            result.append(d)
+        return result
 
     @staticmethod
     def get_node(node_id: str) -> Optional[Dict[str, Any]]:
@@ -219,7 +283,39 @@ class DatabaseManager:
             # Fallback to first active node
             row = conn.execute("SELECT * FROM nodes WHERE is_active = 1 LIMIT 1").fetchone()
         conn.close()
-        return dict(row) if row else None
+        if not row:
+            return None
+        d = dict(row)
+        dyn = calculate_dynamic_tariff(d)
+        d.update(dyn)
+        d["rate_per_kwh"] = dyn["effective_rate_per_kwh"]
+        return d
+
+    @staticmethod
+    def update_node_grid_status(
+        node_id: str,
+        grid_availability: str,
+        power_source: Optional[str] = None,
+        base_rate_per_kwh: Optional[float] = None
+    ) -> Optional[Dict[str, Any]]:
+        conn = DatabaseManager.get_connection()
+        node = conn.execute("SELECT * FROM nodes WHERE id = ?", (node_id,)).fetchone()
+        if not node:
+            conn.close()
+            return None
+
+        keys = node.keys()
+        ps = power_source or (node["power_source"] if "power_source" in keys else "HYBRID")
+        br = base_rate_per_kwh if base_rate_per_kwh is not None else (node["base_rate_per_kwh"] if "base_rate_per_kwh" in keys else node["rate_per_kwh"])
+
+        conn.execute("""
+        UPDATE nodes 
+        SET grid_availability = ?, power_source = ?, base_rate_per_kwh = ?
+        WHERE id = ?
+        """, (grid_availability.upper(), ps.upper(), br, node_id))
+        conn.commit()
+        conn.close()
+        return DatabaseManager.get_node(node_id)
 
     @staticmethod
     def register_node(
@@ -237,9 +333,9 @@ class DatabaseManager:
         now = datetime.now(timezone.utc).isoformat()
         conn = DatabaseManager.get_connection()
         conn.execute("""
-        INSERT INTO nodes (id, name, host_name, host_user_id, location, latitude, longitude, rate_per_kwh, max_power_kw, host_wallet_balance, hardware_secret, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, ?, ?)
-        """, (node_id, name, host_name, host_user_id, location, latitude, longitude, rate_per_kwh, max_power_kw, hardware_secret, now))
+        INSERT INTO nodes (id, name, host_name, host_user_id, location, latitude, longitude, rate_per_kwh, base_rate_per_kwh, grid_availability, power_source, max_power_kw, host_wallet_balance, hardware_secret, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NORMAL', 'HYBRID', ?, 0.0, ?, ?)
+        """, (node_id, name, host_name, host_user_id, location, latitude, longitude, rate_per_kwh, rate_per_kwh, max_power_kw, hardware_secret, now))
         conn.commit()
         conn.close()
         return DatabaseManager.get_node(node_id) # type: ignore

@@ -128,8 +128,9 @@ def test_charge_start_valid_escrow():
     assert res.status_code == 200
     data = res.json()
     assert data["escrow_amount"] == 100.00
-    assert data["rate_per_kwh"] == 10.00
-    assert data["max_energy_kwh"] == 10.00
+    # Demonstrates dynamic power tariff: RelayEV-Node-01 is Surplus Solar (20% off base rate of 10.00 -> 8.00)
+    assert data["rate_per_kwh"] in [8.00, 10.00]
+    assert data["max_energy_kwh"] in [10.00, 12.50]
     assert data["user_remaining_balance"] == 400.00
     assert len(data["session_token"]) > 40
     assert data["session_id"].startswith("REV-")
@@ -400,8 +401,10 @@ def test_escrow_expiry_sweeper():
 def test_receipt_audit_engine():
     sid = f"REV-AUDIT-{uuid.uuid4().hex[:8].upper()}"
     secret = settings.NODE_SIGNATURE_KEY
+    node_data = client.get("/api/nodes/RelayEV-Node-01").json()
+    rate = node_data["rate_per_kwh"]
     energy = 5.0
-    cost = 50.0  # 5.0 kWh * 10.0 INR/kWh
+    cost = round(energy * rate, 2)
     canonical = f"{sid}:{energy:.3f}:{cost:.2f}"
     valid_sig = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
 

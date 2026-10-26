@@ -179,15 +179,23 @@ export default function StationDrawer({
         </button>
       </div>
 
-      {/* Station Parameters */}
+      {/* Station Parameters with Grid Availability Dynamic Tariff */}
       <div className="grid grid-cols-3 gap-2.5 py-2">
         <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/50">
-          <span className="text-[10px] text-slate-400 uppercase font-semibold">Tariff</span>
-          <p className="text-sm font-bold text-emerald-400">₹{node.tariff_per_kwh}<span className="text-[10px] text-slate-400 font-normal">/kWh</span></p>
+          <span className="text-[10px] text-slate-400 uppercase font-semibold">Live Tariff</span>
+          <p className="text-sm font-bold text-emerald-400">
+            ₹{node.effective_rate_per_kwh || node.tariff_per_kwh}
+            <span className="text-[10px] text-slate-400 font-normal">/kWh</span>
+          </p>
         </div>
         <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/50">
-          <span className="text-[10px] text-slate-400 uppercase font-semibold">Max Power</span>
-          <p className="text-sm font-bold text-sky-400">{node.max_power_kw} kW</p>
+          <span className="text-[10px] text-slate-400 uppercase font-semibold">Grid Power</span>
+          <p className="text-sm font-bold text-sky-400">
+            {node.grid_availability === 'surplus' || node.grid_availability === 'SURPLUS' ? '🟢 Surplus' :
+             node.grid_availability === 'strained' || node.grid_availability === 'STRAINED' ? '🔴 Strained' :
+             node.grid_availability === 'inverter_backup' || node.grid_availability === 'BATTERY' ? '⚡ Battery' :
+             '🟡 Normal'}
+          </p>
         </div>
         <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/50">
           <span className="text-[10px] text-slate-400 uppercase font-semibold">Hardware Link</span>
@@ -196,6 +204,13 @@ export default function StationDrawer({
           </p>
         </div>
       </div>
+
+      {node.tariff_reason && (
+        <div className="px-2.5 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/40 text-[11px] text-slate-300 flex items-center justify-between">
+          <span>⚡ Power Availability:</span>
+          <span className="font-semibold text-emerald-400">{node.tariff_reason}</span>
+        </div>
+      )}
 
       {/* Stage: Idle - Select Escrow */}
       {sessionStage === "idle" && (

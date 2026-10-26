@@ -27,6 +27,8 @@ from schemas import (
     NodeRegisterRequest,
     NodePayoutRequest,
     NodePayoutResponse,
+    GridStatusUpdateRequest,
+    DynamicTariffResponse,
     ChargeStartRequest,
     ChargeStartResponse,
     ChargeStopRequest,
@@ -199,6 +201,52 @@ def register_node(request: NodeRegisterRequest):
     )
     return new_node
 
+
+# ==============================================================================
+# DYNAMIC GRID-AWARE TARIFF PRICING ENGINE
+# ==============================================================================
+
+@app.get("/api/nodes/{node_id}/tariff", response_model=DynamicTariffResponse, tags=["Dynamic Grid Tariffs"])
+def get_node_dynamic_tariff(node_id: str):
+    """
+    Returns the real-time grid-aware dynamic tariff calculation for a station based on
+    local power availability (Surplus Solar, Standard Grid, Peak Congestion, or Inverter Backup).
+    """
+    node = DatabaseManager.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found.")
+    return DynamicTariffResponse(
+        node_id=node["id"],
+        node_name=node["name"],
+        base_rate_per_kwh=node.get("base_rate_per_kwh", node["rate_per_kwh"]),
+        effective_rate_per_kwh=node["rate_per_kwh"],
+        grid_availability=node.get("grid_availability", "NORMAL"),
+        power_source=node.get("power_source", "HYBRID"),
+        tariff_multiplier=node.get("tariff_multiplier", 1.0),
+        tariff_reason=node.get("tariff_reason", "Standard Grid Availability"),
+        badge_color=node.get("badge_color", "blue")
+    )
+
+@app.post("/api/nodes/{node_id}/grid-status", response_model=NodeOut, tags=["Dynamic Grid Tariffs"])
+def update_node_grid_status(node_id: str, request: GridStatusUpdateRequest):
+    """
+    Updates the live power availability status for a charging location.
+    Simulates automated telemetry from ESP32 grid sensors or local utility signals:
+    - SURPLUS: 20% discount on base tariff (green solar excess)
+    - NORMAL: 1.00x baseline
+    - STRAINED: 35% peak demand surge
+    - BATTERY: 20% inverter backup surcharge
+    """
+    updated_node = DatabaseManager.update_node_grid_status(
+        node_id=node_id,
+        grid_availability=request.grid_availability,
+        power_source=request.power_source,
+        base_rate_per_kwh=request.base_rate_per_kwh
+    )
+    if not updated_node:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found.")
+    return updated_node
+
 @app.post("/api/nodes/{node_id}/payout", response_model=NodePayoutResponse, tags=["Charging Nodes"])
 def host_node_payout(node_id: str, request: NodePayoutRequest):
     success, rem_bal, msg = DatabaseManager.payout_host_wallet(node_id, request.amount)
@@ -278,6 +326,11 @@ def start_charging_session(request: ChargeStartRequest):
         expires_at_epoch=expires_at
     )
 
+    base_rate = node.get("base_rate_per_kwh", rate_per_kwh)
+    grid_avail = node.get("grid_availability", "NORMAL")
+    multiplier = node.get("tariff_multiplier", 1.0)
+    reason = node.get("tariff_reason", "Standard Grid Tariff")
+
     return ChargeStartResponse(
         session_id=session_id,
         user_id=request.user_id,
@@ -285,12 +338,19 @@ def start_charging_session(request: ChargeStartRequest):
         node_name=node["name"],
         escrow_amount=request.escrow_amount,
         rate_per_kwh=rate_per_kwh,
+        base_rate_per_kwh=base_rate,
+        effective_rate_per_kwh=rate_per_kwh,
+        grid_availability=grid_avail,
+        tariff_multiplier=multiplier,
+        tariff_reason=reason,
         max_energy_kwh=max_energy_kwh,
         session_token=jwt_token,
         escrow_jwt_token=jwt_token,
         user_remaining_balance=new_balance,
         issued_at=issued_at,
-        expires_at=expires_at
+        expires_at=expires_at,
+        tx_id=session_id,
+        max_kwh=max_energy_kwh
     )
 
 @app.post("/api/charge/stop", response_model=ChargeStopResponse, tags=["Escrow Engine"])

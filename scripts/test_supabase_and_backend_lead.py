@@ -101,9 +101,10 @@ def run_verification():
     print("\n[TEST 3] Testing Cryptographic Receipt Audit & Dispute Resolution...")
     secret = "relay_ev_hardware_master_secret_2026"
     test_sid = f"REV-AUDIT-{uuid.uuid4().hex[:8].upper()}"
+    code_n, node_info = api_request("/api/nodes/RelayEV-Node-01")
+    rate = node_info["rate_per_kwh"]
     kwh = 6.450
-    rate = 10.00
-    expected_cost = 64.50
+    expected_cost = round(kwh * rate, 2)
     canonical = f"{test_sid}:{kwh:.3f}:{expected_cost:.2f}"
     valid_hmac = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
 

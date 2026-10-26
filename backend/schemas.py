@@ -43,10 +43,36 @@ class NodeOut(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     rate_per_kwh: float
+    base_rate_per_kwh: Optional[float] = None
+    effective_rate_per_kwh: Optional[float] = None
+    grid_availability: Optional[str] = "NORMAL"
+    power_source: Optional[str] = "HYBRID"
+    tariff_multiplier: Optional[float] = 1.0
+    tariff_reason: Optional[str] = "Standard Grid Availability"
+    badge_color: Optional[str] = "blue"
     max_power_kw: float
     host_wallet_balance: float
     is_active: bool
     firmware_version: str
+
+class GridStatusUpdateRequest(BaseModel):
+    grid_availability: str = Field(..., description="Power availability: SURPLUS, NORMAL, STRAINED, or BATTERY")
+    power_source: Optional[str] = Field(default="HYBRID", description="SOLAR, GRID, BATTERY, or HYBRID")
+    base_rate_per_kwh: Optional[float] = Field(default=None, gt=0, description="Base tariff per kWh in INR")
+    voltage_v: Optional[float] = Field(default=None, description="Local grid voltage reading in Volts")
+    grid_frequency_hz: Optional[float] = Field(default=None, description="Grid AC frequency in Hz")
+
+class DynamicTariffResponse(BaseModel):
+    node_id: str
+    node_name: str
+    base_rate_per_kwh: float
+    effective_rate_per_kwh: float
+    grid_availability: str
+    power_source: str
+    tariff_multiplier: float
+    tariff_reason: str
+    badge_color: str
+    voltage_reading: Optional[float] = None
 
 class NodeRegisterRequest(BaseModel):
     id: str = Field(..., description="Unique Bluetooth node identifier, e.g. RelayEV-Node-05")
@@ -89,12 +115,20 @@ class ChargeStartResponse(BaseModel):
     node_name: str
     escrow_amount: float
     rate_per_kwh: float
+    base_rate_per_kwh: Optional[float] = None
+    effective_rate_per_kwh: Optional[float] = None
+    grid_availability: Optional[str] = "NORMAL"
+    tariff_multiplier: Optional[float] = 1.0
+    tariff_reason: Optional[str] = "Standard Grid Tariff"
     max_energy_kwh: float
     session_token: str
     escrow_jwt_token: str
     user_remaining_balance: float
     issued_at: int
     expires_at: int
+    # Aliases for frontend teammate compatibility
+    tx_id: Optional[str] = None
+    max_kwh: Optional[float] = None
 
 class ReceiptData(BaseModel):
     session_id: str
