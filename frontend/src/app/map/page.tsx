@@ -77,7 +77,7 @@ function MapLoadingSkeleton() {
         <div className="space-y-1.5 text-[11px] font-mono text-left bg-neutral-900/90 border border-neutral-800 rounded-2xl p-3.5 shadow-xl">
           <div className="flex items-center gap-2 text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span>✓ 20 Regional Ports Ready</span>
+            <span>✓ 10 Regional Ports Ready</span>
           </div>
           <div className={`flex items-center gap-2 transition-opacity duration-300 ${loadStep >= 2 ? 'text-emerald-400' : 'text-neutral-500'}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${loadStep >= 2 ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
@@ -104,7 +104,7 @@ export default function DiscoveryMapPage() {
   const [selectedNode, setSelectedNode] = useState<ChargingNode | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'busy'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'busy' | 'offline_fault'>('all');
   const [realtimeActive, setRealtimeActive] = useState<boolean>(false);
   const [handoffPayload, setHandoffPayload] = useState<NodeSelectionPayload | null>(null);
   const [theme, setTheme] = useState<Theme>('light');
@@ -197,7 +197,11 @@ export default function DiscoveryMapPage() {
       node.id.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus =
-      statusFilter === 'all' ? true : node.status === statusFilter;
+      statusFilter === 'all'
+        ? true
+        : statusFilter === 'offline_fault'
+        ? (node.status === 'offline_fault' || (node.status as string) === 'offline')
+        : node.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -230,8 +234,10 @@ export default function DiscoveryMapPage() {
   const primaryStations = nodesWithDistance.filter((n) => n.isPrimary);
   const secondaryStations = nodesWithDistance.filter((n) => !n.isPrimary);
 
-  // Count available ports
+  // Count ports by status
   const availableCount = nodes.filter((n) => n.status === 'available').length;
+  const busyCount = nodes.filter((n) => n.status === 'busy').length;
+  const offlineCount = nodes.filter((n) => n.status === 'offline_fault' || (n.status as string) === 'offline').length;
 
   // Handoff to Person 2 (Escrow) and Person 3 (BLE Connector)
   const handleSelectStation = (node: ChargingNode) => {
@@ -397,7 +403,7 @@ export default function DiscoveryMapPage() {
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Available
+              Available ({availableCount})
             </button>
             <button
               onClick={() => setStatusFilter('busy')}
@@ -408,7 +414,18 @@ export default function DiscoveryMapPage() {
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              Busy
+              Busy ({busyCount})
+            </button>
+            <button
+              onClick={() => setStatusFilter('offline_fault')}
+              className={`flex-1 sm:flex-initial px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition-colors ${
+                statusFilter === 'offline_fault'
+                  ? 'bg-rose-500/20 text-rose-500 border border-rose-500/30'
+                  : isDark ? 'text-neutral-400 hover:text-rose-400' : 'text-gray-500 hover:text-rose-600'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              Offline ({offlineCount})
             </button>
           </div>
         </div>

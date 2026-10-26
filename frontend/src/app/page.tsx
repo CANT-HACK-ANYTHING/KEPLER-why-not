@@ -8,7 +8,7 @@ import { RouteNavigationModal, NavStation } from "@/components/RouteNavigationMo
 import { Coordinates, calculateDistanceKm, DEFAULT_DRIVER_COORDS } from "@/lib/geoUtils";
 
 export interface Station extends NavStation {
-  status: "Available" | "Charging";
+  status: "Available" | "Charging" | "Busy" | "Offline";
   color: "mint" | "peach" | "blue" | "emerald";
   coords: { x: number; y: number };
   hardwareNote?: string;
@@ -19,6 +19,7 @@ export interface Station extends NavStation {
 }
 
 const initialStations: Station[] = [
+  // 6 Online / Available Stations
   {
     id: "node_esp32_01",
     name: "VIT Campus Solar Relay",
@@ -37,25 +38,6 @@ const initialStations: Station[] = [
     longitude: 79.1559,
     coords: { x: 50, y: 35 },
     hardwareNote: "100% Rooftop solar + PZEM-004T with shaded 2W bay",
-  },
-  {
-    id: "node_esp32_02",
-    name: "Katpadi Junction Charging Point",
-    host: "Murugan S. (Station Relay)",
-    place: "Near Katpadi Railway Station, NH-46",
-    power: "3.3 kW",
-    rate: 12.50,
-    baseRate: 12.50,
-    gridAvailability: "NORMAL",
-    powerSource: "GRID",
-    tariffReason: "Standard Grid Power Availability",
-    status: "Available",
-    initials: "KJ",
-    color: "blue",
-    latitude: 12.9783,
-    longitude: 79.1450,
-    coords: { x: 42, y: 28 },
-    hardwareNote: "24/7 Chai point beside station parking, 30A relay",
   },
   {
     id: "node_esp32_03",
@@ -96,25 +78,6 @@ const initialStations: Station[] = [
     hardwareNote: "Heritage moat parking with shaded tree canopy",
   },
   {
-    id: "node_esp32_05",
-    name: "Bagayam Rural Clean Hub",
-    host: "Dr. Anand Green Energy",
-    place: "Near CMC Bagayam Campus, College Hill",
-    power: "3.3 kW",
-    rate: 7.60,
-    baseRate: 9.50,
-    gridAvailability: "SURPLUS",
-    powerSource: "SOLAR",
-    tariffReason: "Clean Campus Micro-Grid Solar (20% Off)",
-    status: "Available",
-    initials: "BR",
-    color: "mint",
-    latitude: 12.8710,
-    longitude: 79.1350,
-    coords: { x: 48, y: 78 },
-    hardwareNote: "Solar battery buffer, open for public 2W/3W charging",
-  },
-  {
     id: "node_esp32_06",
     name: "Ranipet Industrial Corridor Relay",
     host: "Ranipet Fleet Co-op",
@@ -132,44 +95,6 @@ const initialStations: Station[] = [
     longitude: 79.3330,
     coords: { x: 80, y: 48 },
     hardwareNote: "Heavy-duty 32A industrial line for commercial cargo 3W",
-  },
-  {
-    id: "node_esp32_07",
-    name: "Ambur Leather Town Node",
-    host: "Ismail Leather Works",
-    place: "NH-48 Bypass, Near Star Biryani, Ambur",
-    power: "3.3 kW",
-    rate: 14.40,
-    baseRate: 12.00,
-    gridAvailability: "BATTERY",
-    powerSource: "HYBRID",
-    tariffReason: "Highway Battery Backup Inverter (+20%)",
-    status: "Available",
-    initials: "AL",
-    color: "peach",
-    latitude: 12.7905,
-    longitude: 78.7160,
-    coords: { x: 12, y: 88 },
-    hardwareNote: "Highway rest stop node with 24/7 tea & tire check",
-  },
-  {
-    id: "node_esp32_08",
-    name: "Sholinghur Hill Temple Relay",
-    host: "Govindarajan Temple Inn",
-    place: "Foot of Yoga Narasimha Swamy Hill, Sholinghur",
-    power: "3.3 kW",
-    rate: 14.18,
-    baseRate: 10.50,
-    gridAvailability: "STRAINED",
-    powerSource: "GRID",
-    tariffReason: "Hill Route Peak Grid Strain (+35%)",
-    status: "Available",
-    initials: "SH",
-    color: "emerald",
-    latitude: 13.1140,
-    longitude: 79.4240,
-    coords: { x: 88, y: 15 },
-    hardwareNote: "Solar off-grid battery backed charging tap",
   },
   {
     id: "node_esp32_09",
@@ -209,195 +134,85 @@ const initialStations: Station[] = [
     coords: { x: 22, y: 45 },
     hardwareNote: "Subsidized farm community tariff with solar canopy",
   },
+
+  // 2 Busy / In Use Stations
   {
-    id: "node_esp32_11",
-    name: "Arcot Royal Palace Tap",
-    host: "Nawaz Basha (Arcot Sweets Corner)",
-    place: "Palace Road, Near Arcot Clock Tower",
+    id: "node_esp32_02",
+    name: "Katpadi Junction Charging Point",
+    host: "Murugan S. (Station Relay)",
+    place: "Near Katpadi Railway Station, NH-46",
     power: "3.3 kW",
-    rate: 10.50,
-    baseRate: 10.50,
+    rate: 12.50,
+    baseRate: 12.50,
     gridAvailability: "NORMAL",
     powerSource: "GRID",
-    tariffReason: "Standard Municipal Grid Tariff",
-    status: "Available",
-    initials: "AP",
-    color: "mint",
-    latitude: 12.9042,
-    longitude: 79.3326,
-    coords: { x: 74, y: 55 },
-    hardwareNote: "Town center sweet stall tap with shaded e-bike parking",
+    tariffReason: "Standard Grid Power Availability (In Use)",
+    status: "Busy",
+    initials: "KJ",
+    color: "blue",
+    latitude: 12.9783,
+    longitude: 79.1450,
+    coords: { x: 42, y: 28 },
+    hardwareNote: "24/7 Chai point beside station parking, 30A relay",
   },
   {
-    id: "node_esp32_12",
-    name: "Vaniyambadi Biryani Expressway Stop",
-    host: "Farooq Hospitality & EV Point",
-    place: "Chennai-Bengaluru Highway, Vaniyambadi Toll",
-    power: "7.4 kW",
-    rate: 10.80,
-    baseRate: 13.50,
-    gridAvailability: "SURPLUS",
-    powerSource: "SOLAR",
-    tariffReason: "High-Capacity Highway Solar Canopy (20% Off)",
-    status: "Available",
-    initials: "VB",
-    color: "peach",
-    latitude: 12.6830,
-    longitude: 78.6180,
-    coords: { x: 8, y: 95 },
-    hardwareNote: "Express highway dual 32A charging with 24h restaurant",
-  },
-  {
-    id: "node_esp32_13",
-    name: "Pallikonda Toll Plaza Safe Rest",
-    host: "Senguttuvan Highway Lodge",
-    place: "NH-48 KM 126, Pallikonda Service Road",
+    id: "node_esp32_07",
+    name: "Ambur Leather Town Node",
+    host: "Ismail Leather Works",
+    place: "NH-48 Bypass, Near Star Biryani, Ambur",
     power: "3.3 kW",
     rate: 14.40,
     baseRate: 12.00,
     gridAvailability: "BATTERY",
     powerSource: "HYBRID",
-    tariffReason: "Highway Heavy Inverter Storage Relay (+20%)",
-    status: "Available",
-    initials: "PT",
-    color: "blue",
-    latitude: 12.9090,
-    longitude: 78.9660,
-    coords: { x: 30, y: 62 },
-    hardwareNote: "Quiet night parking with 16A industrial plug socket",
-  },
-  {
-    id: "node_esp32_14",
-    name: "Melvisharam Tannery Eco-Charge",
-    host: "Tariq Leather Works & Green Power",
-    place: "Trunk Road, Melvisharam Industrial Area",
-    power: "3.3 kW",
-    rate: 15.53,
-    baseRate: 11.50,
-    gridAvailability: "STRAINED",
-    powerSource: "GRID",
-    tariffReason: "Industrial Feeder Peak Strain (+35%)",
-    status: "Available",
-    initials: "MT",
-    color: "emerald",
-    latitude: 12.9350,
-    longitude: 79.2480,
-    coords: { x: 62, y: 46 },
-    hardwareNote: "Secured yard with surge protector & fire safety buffer",
-  },
-  {
-    id: "node_esp32_15",
-    name: "Tiruvallam Bridge River Tap",
-    host: "Selvam Coconut Grove & Charging",
-    place: "Ponnai Road Junction, Tiruvallam",
-    power: "3.3 kW",
-    rate: 7.20,
-    baseRate: 9.00,
-    gridAvailability: "SURPLUS",
-    powerSource: "SOLAR",
-    tariffReason: "Riverbed Farm Solar Array Discount (20% Off)",
-    status: "Available",
-    initials: "TB",
-    color: "mint",
-    latitude: 12.9960,
-    longitude: 79.2230,
-    coords: { x: 58, y: 22 },
-    hardwareNote: "Shaded coconut orchard parking with cool breeze & water",
-  },
-  {
-    id: "node_esp32_16",
-    name: "Sathuvachari Expressway Transit",
-    host: "Ramesh Babu Express Laundry",
-    place: "Near Collectorate Office, Sathuvachari",
-    power: "3.3 kW",
-    rate: 10.00,
-    baseRate: 10.00,
-    gridAvailability: "NORMAL",
-    powerSource: "GRID",
-    tariffReason: "District HQ Stable Municipal Feeder",
-    status: "Available",
-    initials: "SE",
-    color: "blue",
-    latitude: 12.9380,
-    longitude: 79.1650,
-    coords: { x: 52, y: 45 },
-    hardwareNote: "Convenient urban node near govt offices & commercial banks",
-  },
-  {
-    id: "node_esp32_17",
-    name: "VIT Lake Back-Gate Eco-Tap",
-    host: "Student Tech Innovators Co-op",
-    place: "Behind VIT Lake, Kangeyanallur Road",
-    power: "3.3 kW",
-    rate: 6.40,
-    baseRate: 8.00,
-    gridAvailability: "SURPLUS",
-    powerSource: "SOLAR",
-    tariffReason: "Campus Micro-Grid Student Research Subsidy (-20%)",
-    status: "Available",
-    initials: "VL",
-    color: "emerald",
-    latitude: 12.9730,
-    longitude: 79.1620,
-    coords: { x: 51, y: 34 },
-    hardwareNote: "IoT PZEM telemetry node with experimental solar tracker",
-  },
-  {
-    id: "node_esp32_18",
-    name: "Vellore Old Town Bazaar Point",
-    host: "Mustafa Merchant Union",
-    place: "Main Bazaar Road, Near Long Bazaar",
-    power: "3.3 kW",
-    rate: 16.88,
-    baseRate: 12.50,
-    gridAvailability: "STRAINED",
-    powerSource: "GRID",
-    tariffReason: "Dense Market Evening Peak Congestion (+35%)",
-    status: "Available",
-    initials: "VO",
+    tariffReason: "Highway Battery Backup Inverter (In Use)",
+    status: "Busy",
+    initials: "AL",
     color: "peach",
-    latitude: 12.9150,
-    longitude: 79.1300,
-    coords: { x: 45, y: 56 },
-    hardwareNote: "Heavy traffic commercial corridor with delivery 3W bay",
+    latitude: 12.7905,
+    longitude: 78.7160,
+    coords: { x: 12, y: 88 },
+    hardwareNote: "Highway rest stop node with 24/7 tea & tire check",
   },
+
+  // 2 Offline / Maintenance Stations
   {
-    id: "node_esp32_19",
-    name: "Otteri Lake Nature Park Relay",
-    host: "Green Valley Eco Resort",
-    place: "Otteri Circular Road, Southern Foothills",
-    power: "7.2 kW",
-    rate: 10.00,
-    baseRate: 10.00,
-    gridAvailability: "NORMAL",
-    powerSource: "HYBRID",
-    tariffReason: "Stable Green Buffer Zone Baseline",
-    status: "Available",
-    initials: "OL",
+    id: "node_esp32_05",
+    name: "Bagayam Rural Clean Hub",
+    host: "Dr. Anand Green Energy",
+    place: "Near CMC Bagayam Campus, College Hill",
+    power: "3.3 kW",
+    rate: 7.60,
+    baseRate: 9.50,
+    gridAvailability: "SURPLUS",
+    powerSource: "SOLAR",
+    tariffReason: "Scheduled Solar Inverter & Battery Buffer Maintenance (Offline)",
+    status: "Offline",
+    initials: "BR",
     color: "mint",
-    latitude: 12.8870,
-    longitude: 79.1240,
-    coords: { x: 44, y: 72 },
-    hardwareNote: "Dual fast AC charging bay surrounded by nature walking trail",
+    latitude: 12.8710,
+    longitude: 79.1350,
+    coords: { x: 48, y: 78 },
+    hardwareNote: "Scheduled Solar Inverter & Battery Buffer Maintenance (Offline)",
   },
   {
-    id: "node_esp32_20",
-    name: "Arakkonam Rail Hub Inter-Connect",
-    host: "Murthy Transport Logistics",
-    place: "Station Road, Arakkonam Junction Feeder",
-    power: "7.4 kW",
-    rate: 13.20,
-    baseRate: 11.00,
-    gridAvailability: "BATTERY",
-    powerSource: "BATTERY_BACKUP",
-    tariffReason: "Railway Substation Battery Inverter Bank (+20%)",
-    status: "Available",
-    initials: "AR",
-    color: "blue",
-    latitude: 13.0800,
-    longitude: 79.6700,
-    coords: { x: 96, y: 12 },
-    hardwareNote: "High-capacity railway interchange buffer for 2W/3W fleets",
+    id: "node_esp32_08",
+    name: "Sholinghur Hill Temple Relay",
+    host: "Govindarajan Temple Inn",
+    place: "Foot of Yoga Narasimha Swamy Hill, Sholinghur",
+    power: "3.3 kW",
+    rate: 14.18,
+    baseRate: 10.50,
+    gridAvailability: "STRAINED",
+    powerSource: "GRID",
+    tariffReason: "Hill Route Peak Grid Strain (+35%) (Offline)",
+    status: "Offline",
+    initials: "SH",
+    color: "emerald",
+    latitude: 13.1140,
+    longitude: 79.4240,
+    coords: { x: 88, y: 15 },
+    hardwareNote: "Hill Line Transformer Servicing & Battery Calibration (Offline)",
   },
 ];
 
@@ -458,7 +273,11 @@ export default function Home() {
               gridAvailability: gridAvail,
               powerSource: n.power_source || preset.powerSource || "GRID",
               tariffReason: tariffReason,
-              status: n.is_active ? "Available" : "Charging",
+              status: (!n.is_active || n.id === "node_esp32_05" || n.id === "node_esp32_08")
+                ? "Offline"
+                : (n.id === "node_esp32_02" || n.id === "node_esp32_07")
+                ? "Busy"
+                : "Available",
               initials: n.name
                 .split(" ")
                 .map((w: string) => w[0])
@@ -593,7 +412,7 @@ export default function Home() {
               Vellore EV Mesh Network
             </h1>
             <p className="text-sm text-slate-400 mt-0.5">
-              20 verified decentralized charging stations operating with dynamic grid power tariffs.
+              10 verified decentralized charging stations operating with dynamic grid power tariffs.
             </p>
           </div>
 
@@ -610,7 +429,7 @@ export default function Home() {
               href="/map"
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-900/40 transition"
             >
-              <span>🗺️ Hex Map (20)</span>
+              <span>🗺️ Hex Map (10)</span>
               <span>↗</span>
             </Link>
           </div>
@@ -651,7 +470,7 @@ export default function Home() {
             <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-slate-700/60 text-xs">
               <div>
                 <span className="text-slate-400 block text-[11px]">Nodes In Range</span>
-                <span className="font-bold text-white text-sm">20 Stations</span>
+                <span className="font-bold text-white text-sm">10 Stations</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[11px]">Dynamic Grid Rates</span>
@@ -659,7 +478,7 @@ export default function Home() {
               </div>
               <div>
                 <span className="text-slate-400 block text-[11px]">Macro Hex Clusters</span>
-                <span className="font-bold text-emerald-400 text-sm">3 Regional Sectors</span>
+                <span className="font-bold text-emerald-400 text-sm">2 Regional Sectors</span>
               </div>
             </div>
           </div>
@@ -670,7 +489,7 @@ export default function Home() {
               <div className="flex items-center justify-between text-xs font-bold text-slate-400 mb-2">
                 <span>INTERACTIVE HEX MAP</span>
                 <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px]">
-                  20 LOCATIONS
+                  10 LOCATIONS
                 </span>
               </div>
               <h3 className="text-base font-bold text-white mb-1.5">
@@ -686,7 +505,7 @@ export default function Home() {
                 href="/map"
                 className="w-full text-center bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-2.5 rounded-xl border border-slate-600 transition flex items-center justify-center gap-2"
               >
-                <span>🗺️ Open Full Hex Map (20)</span>
+                <span>🗺️ Open Full Hex Map (10)</span>
                 <span>→</span>
               </Link>
               <button
@@ -707,7 +526,7 @@ export default function Home() {
             </span>
             <input
               type="text"
-              placeholder="Search 20 stations (VIT, Katpadi, Sripuram, Arcot, Ambur, Vaniyambadi)..."
+              placeholder="Search 10 stations (VIT, Katpadi, Sripuram, Arcot, Ambur, Vaniyambadi)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-900 border border-slate-700 text-white placeholder-slate-500 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-emerald-500 transition"
@@ -755,7 +574,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Station Grid (20 Verified Locations) */}
+        {/* Station Grid (10 Verified Locations) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {displayedStations.map((st) => {
             const distanceKm = calculateDistanceKm(driverCoords, {
@@ -788,7 +607,9 @@ export default function Home() {
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
                         st.status === "Available"
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                          : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                          : st.status === "Busy" || st.status === "Charging"
+                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                          : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                       }`}
                     >
                       {st.status}

@@ -72,7 +72,7 @@ function HostDashboardContent() {
     rate_per_kwh: st.rate,
     max_power_kw: parseFloat(st.power) || 3.3,
     host_wallet_balance: 0.0,
-    is_active: true,
+    is_active: st.isActive,
     firmware_version: "v1.2.0-mesh-pzem",
   }));
 
@@ -303,11 +303,15 @@ function HostDashboardContent() {
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
               ACTIVE MESH STATIONS
             </span>
-            <div className="text-2xl sm:text-3xl font-black text-white">
-              10 / 10 Online
+            <div className="text-xl sm:text-2xl font-black text-white flex items-center gap-1.5 flex-wrap">
+              <span className="text-emerald-400">6 Online</span>
+              <span className="text-slate-500">•</span>
+              <span className="text-amber-400">2 Busy</span>
+              <span className="text-slate-500">•</span>
+              <span className="text-rose-400">2 Offline</span>
             </div>
-            <span className="text-xs text-emerald-400 mt-1 block">
-              ✓ Vellore Corridor Hexagonal Core
+            <span className="text-xs text-slate-400 mt-1 block">
+              10 Total Ports • Vellore Corridor Core
             </span>
           </div>
 
@@ -334,6 +338,16 @@ function HostDashboardContent() {
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-thin">
             {activeNodes.map((node) => {
               const isSelected = selectedNode?.id === node.id;
+              const stMeta = VELLORE_STATIONS.find((s) => s.id === node.id);
+              const status = stMeta?.status || (node.is_active ? "available" : "offline_fault");
+              const statusColor =
+                status === "available"
+                  ? "bg-emerald-400"
+                  : status === "busy"
+                  ? "bg-amber-400"
+                  : "bg-rose-500";
+              const statusText =
+                status === "available" ? "Online" : status === "busy" ? "Busy" : "Offline";
               return (
                 <button
                   key={node.id}
@@ -346,11 +360,20 @@ function HostDashboardContent() {
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span
-                      className={`w-2 h-2 rounded-full ${
-                        isSelected ? "bg-emerald-400 animate-ping" : "bg-emerald-500"
+                      className={`w-2 h-2 rounded-full ${statusColor} ${
+                        isSelected && status !== "offline_fault" ? "animate-ping" : ""
                       }`}
                     />
                     <span className="text-xs font-bold text-white line-clamp-1">{node.name}</span>
+                    <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                      status === "available"
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        : status === "busy"
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                    }`}>
+                      {statusText}
+                    </span>
                   </div>
                   <div className="text-[11px] text-slate-400 flex items-center justify-between gap-3">
                     <span className="font-mono text-[10px] text-slate-500">{node.id}</span>
@@ -397,17 +420,31 @@ function HostDashboardContent() {
               </div>
 
               {/* Card 3: Node Hardware */}
-              <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  HARDWARE &amp; SAFETY
-                </div>
-                <div className="text-lg font-bold text-emerald-400 my-1">
-                  ⚡ 30A Failsafe Relay
-                </div>
-                <div className="text-xs text-slate-400">
-                  PZEM-004T Meter • ESP32-S3 Mesh
-                </div>
-              </div>
+              {(() => {
+                const stMeta = VELLORE_STATIONS.find((s) => s.id === selectedNode.id);
+                const status = stMeta?.status || (selectedNode.is_active ? "available" : "offline_fault");
+                return (
+                  <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      HARDWARE &amp; SAFETY
+                    </div>
+                    <div className={`text-base font-bold my-1 ${
+                      status === "available"
+                        ? "text-emerald-400"
+                        : status === "busy"
+                        ? "text-amber-400"
+                        : "text-rose-400"
+                    }`}>
+                      {status === "available" && "⚡ 30A Failsafe Relay (Online)"}
+                      {status === "busy" && "⚡ Active Session (Busy)"}
+                      {status === "offline_fault" && "⚠️ Maintenance Mode (Offline)"}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {stMeta?.hardwareNote || "PZEM-004T Meter • ESP32-S3 Mesh"}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Card 4: Host Details */}
               <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">

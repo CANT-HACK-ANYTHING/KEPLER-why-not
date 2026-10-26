@@ -135,32 +135,26 @@ def init_database():
             ("host_mohan", "Mohan Ram (Host)", "+91-9822334455", "host", 0.00, now, now)
         ])
 
-    # Seed / Upsert All 20 Verified Mock Charging Nodes
+    # Seed / Upsert All 10 Verified Mock Charging Nodes (6 Online, 2 Busy, 2 Offline)
     now = datetime.now(timezone.utc).isoformat()
-    seed_nodes_20 = [
+    seed_nodes_10 = [
         ("node_esp32_01", "VIT Campus Solar Relay", "Rajesh Kumar (VIT Solar Grid)", "host_rajesh", "Near VIT Main Gate, Tiruvalam Road, Katpadi", 12.9692, 79.1559, 8.00, 10.00, "SURPLUS", "SOLAR", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.4, "87602816BFFFFFF", "100% Rooftop solar + PZEM-004T with shaded 2W bay", now),
         ("node_esp32_02", "Katpadi Junction Charging Point", "Murugan S. (Station Relay)", "host_murugan", "Near Katpadi Railway Station, NH-46", 12.9783, 79.1450, 12.50, 12.50, "NORMAL", "GRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.4, "87602816AFFFFFF", "24/7 Chai point beside station parking, 30A relay", now),
         ("node_esp32_03", "Sripuram Golden Temple Hub", "Lakshmi Narayani Trust", "host_sripuram", "Malaikodi, Sripuram Temple Road", 12.8998, 79.1162, 6.80, 8.50, "SURPLUS", "SOLAR", 7.20, 0.00, settings.NODE_SIGNATURE_KEY, 1, 3.2, "87602814DFFFFFF", "Dual Type-2 Fast AC with pilgrimage visitor parking", now),
         ("node_esp32_04", "Vellore Fort Heritage Tap", "Kannan Heritage Cafeteria", "host_kannan", "Opp. Vellore Fort East Gate, Anna Salai", 12.9205, 79.1325, 11.00, 11.00, "NORMAL", "GRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.5, "87602815AFFFFFF", "Heritage moat parking with shaded tree canopy", now),
-        ("node_esp32_05", "Bagayam Rural Clean Hub", "Dr. Anand Green Energy", "host_anand", "Near CMC Bagayam Campus, College Hill", 12.8710, 79.1350, 7.60, 9.50, "SURPLUS", "SOLAR", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.8, "876028143FFFFFF", "Solar battery buffer, open for public 2W/3W charging", now),
+        ("node_esp32_05", "Bagayam Rural Clean Hub", "Dr. Anand Green Energy", "host_anand", "Near CMC Bagayam Campus, College Hill", 12.8710, 79.1350, 7.60, 9.50, "SURPLUS", "SOLAR", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 0, 2.8, "876028143FFFFFF", "Scheduled Solar Inverter & Battery Buffer Maintenance (Offline)", now),
         ("node_esp32_06", "Ranipet Industrial Corridor Relay", "Ranipet Fleet Co-op", "host_ranipet", "SIPCOT Phase 1, Chennai Highway, Ranipet", 12.9275, 79.3330, 17.55, 13.00, "STRAINED", "GRID", 7.40, 0.00, settings.NODE_SIGNATURE_KEY, 1, 3.6, "876028172FFFFFF", "Heavy-duty 32A industrial line for commercial cargo 3W", now),
         ("node_esp32_07", "Ambur Leather Town Node", "Ismail Leather Works", "host_ismail", "NH-48 Bypass, Near Star Biryani, Ambur", 12.7905, 78.7160, 14.40, 12.00, "BATTERY", "HYBRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 4.0, "87602810CFFFFFF", "Highway rest stop node with 24/7 tea & tire check", now),
-        ("node_esp32_08", "Sholinghur Hill Temple Relay", "Govindarajan Temple Inn", "host_govind", "Foot of Yoga Narasimha Swamy Hill, Sholinghur", 13.1140, 79.4240, 14.18, 10.50, "STRAINED", "GRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 3.0, "87602811EFFFFFF", "Solar off-grid battery backed charging tap", now),
+        ("node_esp32_08", "Sholinghur Hill Temple Relay", "Govindarajan Temple Inn", "host_govind", "Foot of Yoga Narasimha Swamy Hill, Sholinghur", 13.1140, 79.4240, 14.18, 10.50, "STRAINED", "GRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 0, 3.0, "87602811EFFFFFF", "Hill Line Transformer Servicing & Battery Calibration (Offline)", now),
         ("node_esp32_09", "Walajah Highway Toll Dhaba", "Highway King Dhaba Tap", "host_walajah", "NH-48 Toll Plaza Corridor, Walajapet", 12.9810, 79.3620, 16.80, 14.00, "BATTERY", "HYBRID", 7.20, 0.00, settings.NODE_SIGNATURE_KEY, 1, 3.5, "87602817AFFFFFF", "24/7 Dhaba dining with fenced overnight EV charging bay", now),
         ("node_esp32_10", "Gudiyatham Agricultural Feeder", "Venkatesan Agro Solar", "host_gudiyatham", "Agricultural Market Yard, Gudiyatham Bypass", 12.9460, 78.8710, 7.20, 9.00, "SURPLUS", "SOLAR", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 3.8, "87602812EFFFFFF", "Subsidized farm community tariff with solar canopy", now),
-        ("node_esp32_11", "Arcot Royal Palace Tap", "Nawaz Basha (Arcot Sweets Corner)", "host_nawaz", "Palace Road, Near Arcot Clock Tower", 12.9042, 79.3326, 10.50, 10.50, "NORMAL", "GRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.5, "876028173FFFFFF", "Town center sweet stall tap with shaded e-bike parking", now),
-        ("node_esp32_12", "Vaniyambadi Biryani Expressway Stop", "Farooq Hospitality & EV Point", "host_farooq", "Chennai-Bengaluru Highway, Vaniyambadi Toll", 12.6830, 78.6180, 10.80, 13.50, "SURPLUS", "SOLAR", 7.40, 0.00, settings.NODE_SIGNATURE_KEY, 1, 4.2, "876028105FFFFFF", "Express highway dual 32A charging with 24h restaurant", now),
-        ("node_esp32_13", "Pallikonda Toll Plaza Safe Rest", "Senguttuvan Highway Lodge", "host_senguttuvan", "NH-48 KM 126, Pallikonda Service Road", 12.9090, 78.9660, 14.40, 12.00, "BATTERY", "HYBRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 3.2, "876028135FFFFFF", "Quiet night parking with 16A industrial plug socket", now),
-        ("node_esp32_14", "Melvisharam Tannery Eco-Charge", "Tariq Leather Works & Green Power", "host_tariq", "Trunk Road, Melvisharam Industrial Area", 12.9350, 79.2480, 15.53, 11.50, "STRAINED", "GRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.6, "87602816EFFFFFF", "Secured yard with surge protector & fire safety buffer", now),
-        ("node_esp32_15", "Tiruvallam Bridge River Tap", "Selvam Coconut Grove & Charging", "host_selvam", "Ponnai Road Junction, Tiruvallam", 12.9960, 79.2230, 7.20, 9.00, "SURPLUS", "SOLAR", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.8, "87602816DFFFFFF", "Shaded coconut orchard parking with cool breeze & water", now),
-        ("node_esp32_16", "Sathuvachari Expressway Transit", "Ramesh Babu Express Laundry", "host_ramesh", "Near Collectorate Office, Sathuvachari", 12.9380, 79.1650, 10.00, 10.00, "NORMAL", "GRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.2, "87602815BFFFFFF", "Convenient urban node near govt offices & commercial banks", now),
-        ("node_esp32_17", "VIT Lake Back-Gate Eco-Tap", "Student Tech Innovators Co-op", "host_techcoop", "Behind VIT Lake, Kangeyanallur Road", 12.9730, 79.1620, 6.40, 8.00, "SURPLUS", "SOLAR", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.0, "876028169FFFFFF", "IoT PZEM telemetry node with experimental solar tracker", now),
-        ("node_esp32_18", "Vellore Old Town Bazaar Point", "Mustafa Merchant Union", "host_mustafa", "Main Bazaar Road, Near Long Bazaar", 12.9150, 79.1300, 16.88, 12.50, "STRAINED", "GRID", 3.30, 0.00, settings.NODE_SIGNATURE_KEY, 1, 2.0, "876028158FFFFFF", "Heavy traffic commercial corridor with delivery 3W bay", now),
-        ("node_esp32_19", "Otteri Lake Nature Park Relay", "Green Valley Eco Resort", "host_greenvalley", "Otteri Circular Road, Southern Foothills", 12.8870, 79.1240, 10.00, 10.00, "NORMAL", "HYBRID", 7.20, 0.00, settings.NODE_SIGNATURE_KEY, 1, 3.0, "876028148FFFFFF", "Dual fast AC charging bay surrounded by nature walking trail", now),
-        ("node_esp32_20", "Arakkonam Rail Hub Inter-Connect", "Murthy Transport Logistics", "host_murthy", "Station Road, Arakkonam Junction Feeder", 13.0800, 79.6700, 13.20, 11.00, "BATTERY", "BATTERY_BACKUP", 7.40, 0.00, settings.NODE_SIGNATURE_KEY, 1, 4.5, "876028189FFFFFF", "High-capacity railway interchange buffer for 2W/3W fleets", now),
     ]
 
-    for n in seed_nodes_20:
+    # Delete extraneous nodes beyond the 10
+    valid_ids = [n[0] for n in seed_nodes_10]
+    cursor.execute(f"DELETE FROM nodes WHERE id NOT IN ({','.join('?' for _ in valid_ids)})", valid_ids)
+
+    for n in seed_nodes_10:
         cursor.execute("""
         INSERT INTO nodes (
             id, name, host_name, host_user_id, location, latitude, longitude,
@@ -180,6 +174,7 @@ def init_database():
             grid_availability=excluded.grid_availability,
             power_source=excluded.power_source,
             max_power_kw=excluded.max_power_kw,
+            is_active=excluded.is_active,
             coverage_radius_km=excluded.coverage_radius_km,
             hex_cell_id=excluded.hex_cell_id,
             hardware_note=excluded.hardware_note
@@ -312,7 +307,7 @@ class DatabaseManager:
 
         # 2. Local SQLite Edge database query
         conn = DatabaseManager.get_connection()
-        rows = conn.execute("SELECT * FROM nodes WHERE is_active = 1").fetchall()
+        rows = conn.execute("SELECT * FROM nodes ORDER BY id ASC").fetchall()
         conn.close()
         result = []
         for r in rows:
