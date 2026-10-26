@@ -626,8 +626,11 @@ def sync_data_mule_receipts(request: MuleSyncRequest):
 # ==============================================================================
 
 @app.get("/api/transactions", response_model=List[TransactionOut], tags=["Audit & Admin"])
-def list_all_transactions(limit: int = Query(default=100, le=500)):
-    return DatabaseManager.get_all_transactions(limit)
+def list_all_transactions(
+    limit: int = Query(default=100, le=500),
+    node_id: Optional[str] = Query(default=None)
+):
+    return DatabaseManager.get_all_transactions(limit=limit, node_id=node_id)
 
 # ==============================================================================
 # PERSON 2: BACKEND & SUPABASE CLOUD LEAD ENDPOINTS

@@ -234,7 +234,9 @@ def calculate_dynamic_tariff(node: Dict[str, Any]) -> Dict[str, Any]:
 class DatabaseManager:
     @staticmethod
     def get_connection():
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30.0)
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA busy_timeout = 30000;")
         conn.execute("PRAGMA foreign_keys = ON;")
         conn.row_factory = sqlite3.Row
         return conn
@@ -527,9 +529,12 @@ class DatabaseManager:
         return [dict(r) for r in rows]
 
     @staticmethod
-    def get_all_transactions(limit: int = 100) -> List[Dict[str, Any]]:
+    def get_all_transactions(limit: int = 100, node_id: Optional[str] = None) -> List[Dict[str, Any]]:
         conn = DatabaseManager.get_connection()
-        rows = conn.execute("SELECT * FROM transactions ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        if node_id:
+            rows = conn.execute("SELECT * FROM transactions WHERE node_id = ? ORDER BY created_at DESC LIMIT ?", (node_id, limit)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM transactions ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
         conn.close()
         return [dict(r) for r in rows]
 

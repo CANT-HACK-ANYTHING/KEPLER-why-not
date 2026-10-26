@@ -1,18 +1,24 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { ChargingReceipt } from "@/types/ble";
 import { BleConnector } from "./BleConnector";
 import { BleSimulator } from "./BleSimulator";
 import { OfflineMeshStorage } from "@/lib/offlineMeshStorage";
+import { VELLORE_STATIONS, getStationById } from "@/lib/stationsData";
 
 interface ChargingSessionManagerProps {
   initialNodeId?: string;
   initialNodeName?: string;
   ratePerKwh?: number;
+  hostName?: string;
+  location?: string;
   backendApiUrl?: string;
   onClose?: () => void;
   onBalanceUpdated?: (newBalance: number) => void;
+  onHostEarningsUpdated?: (nodeId: string, amount: number) => void;
+  allowStationSwitch?: boolean;
 }
 
 interface SettlementData {
@@ -30,27 +36,43 @@ interface SettlementData {
 }
 
 export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
-  initialNodeId = "RelayEV-Node-01",
-  initialNodeName = "Mohan's Courtyard Node",
-  ratePerKwh = 10.0,
+  initialNodeId = "node_esp32_01",
+  initialNodeName,
+  ratePerKwh,
+  hostName,
+  location,
   backendApiUrl = "http://localhost:8000",
   onClose,
-  onBalanceUpdated
+  onBalanceUpdated,
+  onHostEarningsUpdated,
+  allowStationSwitch = true,
 }) => {
   const [nodeId, setNodeId] = useState<string>(initialNodeId);
   const [escrowAmount, setEscrowAmount] = useState<number>(100);
   const [sessionToken, setSessionToken] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
   const [walletBalance, setWalletBalance] = useState<number>(500.0);
-  const [isSimulatorMode, setIsSimulatorMode] = useState<boolean>(true); // Default to Mock ESP32 Simulator
+  const [isSimulatorMode, setIsSimulatorMode] = useState<boolean>(true);
   const [isFetchingToken, setIsFetchingToken] = useState<boolean>(false);
   const [settledReceipt, setSettledReceipt] = useState<ChargingReceipt | null>(null);
   const [settlementData, setSettlementData] = useState<SettlementData | null>(null);
   const [settlementError, setSettlementError] = useState<string>("");
 
+  // Resolve Station Information
+  const station = getStationById(nodeId);
+  const activeName = initialNodeName || station.name;
+  const activeRate = ratePerKwh || station.rate;
+  const activeHost = hostName || station.host;
+  const activePlace = location || station.place;
+
   // Sync initialNodeId prop changes
   useEffect(() => {
-    if (initialNodeId) setNodeId(initialNodeId);
+    if (initialNodeId && initialNodeId !== nodeId) {
+      setNodeId(initialNodeId);
+      setSessionToken("");
+      setSettlementData(null);
+      setSettledReceipt(null);
+    }
   }, [initialNodeId]);
 
   // Fetch live user wallet balance on mount
@@ -67,13 +89,12 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
         if (onBalanceUpdated) onBalanceUpdated(data.wallet_balance);
       }
     } catch {
-      // Backend not running, use fallback
       console.warn("[SessionManager] Backend offline; running in local resilient mode.");
     }
   };
 
   /**
-   * Step 1 & 2: Lock Escrow and retrieve JWT session_token from Person 2's FastAPI
+   * Step 1 & 2: Lock Escrow and retrieve JWT session_token
    */
   const handleLockEscrowAndStart = async () => {
     setIsFetchingToken(true);
@@ -88,8 +109,8 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
         body: JSON.stringify({
           user_id: "user_88",
           node_id: nodeId,
-          escrow_amount: escrowAmount
-        })
+          escrow_amount: escrowAmount,
+        }),
       });
 
       if (response.ok) {
@@ -102,17 +123,27 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
           if (onBalanceUpdated) onBalanceUpdated(data.user_remaining_balance);
         }
       } else {
-        const errJson = await response.json();
-        throw new Error(errJson.detail || `Server returned ${response.status}`);
+        const err = await response.json();
+        throw new Error(err.detail || "Escrow lock failed");
       }
-    } catch (err: unknown) {
-      console.warn("[SessionManager] Live backend unreachable, generating local offline token:", err);
-      // Fallback: Generate local cryptographic JWT voucher
-      const offlineSession = `REV-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-      setSessionId(offlineSession);
-      const dummyToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzg4Iiwic2Vzc2lvbl9pZCI6IiR7b2ZmbGluZVNlc3Npb259Iiwibm9kZV9pZCI6IiR7bm9kZUlkfSIsImVzY3Jvd19hbW91bnQiOiR7ZXNjcm93QW1vdW50fSwiaWF0IjoxNzkzMDE3ODA1LCJleHAiOjE3OTMwMjUwMDV9.offline_signature`;
-      setSessionToken(dummyToken);
-      setWalletBalance((prev) => Math.max(0, prev - escrowAmount));
+    } catch (err: any) {
+      // Local offline fallback voucher
+      console.warn("[SessionManager] Using local offline cryptographic voucher fallback:", err.message);
+      const offlineSessionId = `SESS-OFFLINE-${Date.now().toString().slice(-6)}`;
+      const offlineToken = `mock.jwt.voucher.${btoa(
+        JSON.stringify({
+          sub: "user_88",
+          node_id: nodeId,
+          session_id: offlineSessionId,
+          escrow_amount: escrowAmount,
+          rate_per_kwh: activeRate,
+        })
+      )}`;
+      setSessionId(offlineSessionId);
+      setSessionToken(offlineToken);
+      const newBal = +(walletBalance - escrowAmount).toFixed(2);
+      setWalletBalance(newBal);
+      if (onBalanceUpdated) onBalanceUpdated(newBal);
     } finally {
       setIsFetchingToken(false);
     }
@@ -129,7 +160,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
       const response = await fetch(`${backendApiUrl}/api/charge/stop`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(receipt)
+        body: JSON.stringify(receipt),
       });
 
       if (response.ok) {
@@ -137,18 +168,31 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
         setSettlementData(resData);
         setWalletBalance(resData.user_new_balance);
         if (onBalanceUpdated) onBalanceUpdated(resData.user_new_balance);
+        if (onHostEarningsUpdated) onHostEarningsUpdated(nodeId, resData.host_earnings);
+
+        // Broadcast event for Host Dashboard live reflection
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("host-earnings-updated", {
+              detail: {
+                nodeId,
+                hostEarnings: resData.host_earnings,
+                sessionId: resData.session_id,
+              },
+            })
+          );
+        }
       } else {
         throw new Error(`Stop endpoint returned ${response.status}`);
       }
     } catch {
-      // Local settlement calculation if backend is unreachable
+      // Local resilient settlement calculation
       const actual = receipt.actual_cost;
       const refund = Math.max(0, +(escrowAmount - actual).toFixed(2));
       const newBal = +(walletBalance + refund).toFixed(2);
 
-      // Save receipt to offline queue for automatic cloud sync when network resumes
       OfflineMeshStorage.enqueueOfflineReceipt(receipt);
-      setSettlementData({
+      const offlineSettlement: SettlementData = {
         session_id: receipt.session_id,
         status: "SETTLED (OFFLINE CACHED)",
         escrow_amount: escrowAmount,
@@ -159,12 +203,29 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
         host_earnings: actual,
         signature_verified: true,
         synced_via: "DIRECT_PHONE",
-        message: `Session settled locally. Refund of ₹${refund.toFixed(2)} credited.`
-      });
+        message: `Session settled locally. Refund of ₹${refund.toFixed(2)} credited to driver wallet.`,
+      };
+      setSettlementData(offlineSettlement);
       setWalletBalance(newBal);
       if (onBalanceUpdated) onBalanceUpdated(newBal);
+      if (onHostEarningsUpdated) onHostEarningsUpdated(nodeId, actual);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("host-earnings-updated", {
+            detail: {
+              nodeId,
+              hostEarnings: actual,
+              sessionId: receipt.session_id,
+            },
+          })
+        );
+      }
     }
   };
+
+  // Safe simulated target kWh that stays within escrow amount (~65% consumption)
+  const simulatedTargetKwh = parseFloat(((escrowAmount * 0.65) / activeRate).toFixed(2)) || 2.5;
 
   return (
     <div
@@ -178,7 +239,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
         borderRadius: "16px",
         padding: "24px",
         boxShadow: "0 10px 30px rgba(25, 52, 47, 0.08)",
-        color: "#18322c"
+        color: "#18322c",
       }}
     >
       {/* Header Bar */}
@@ -189,18 +250,21 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
           alignItems: "flex-start",
           marginBottom: "18px",
           borderBottom: "1px solid #edf2ea",
-          paddingBottom: "14px"
+          paddingBottom: "14px",
         }}
       >
         <div>
           <div style={{ fontSize: "10px", letterSpacing: "1.4px", fontWeight: 700, color: "#618070", textTransform: "uppercase" }}>
-            OFFLINE P2P HARDWARE BRIDGE
+            OFFLINE P2P HARDWARE BRIDGE · VELLORE MESH
           </div>
-          <h2 style={{ margin: "4px 0 0", fontFamily: "Georgia, serif", fontSize: "22px", fontWeight: 600 }}>
-            {initialNodeName || "EV Charging Station"}
+          <h2 style={{ margin: "4px 0 0", fontFamily: "Georgia, serif", fontSize: "22px", fontWeight: 700, color: "#19342f" }}>
+            {activeName}
           </h2>
           <div style={{ fontSize: "12px", color: "#547365", marginTop: "2px" }}>
-            Node ID: <strong style={{ color: "#1d5241" }}>{nodeId}</strong> · Tariff: ₹{ratePerKwh.toFixed(2)}/kWh
+            Hosted by <strong>{activeHost}</strong> • 📍 {activePlace}
+          </div>
+          <div style={{ fontSize: "11px", color: "#059669", fontWeight: 600, marginTop: "2px" }}>
+            Node ID: <code style={{ background: "#ecfdf5", padding: "1px 6px", borderRadius: "4px" }}>{nodeId}</code> · Tariff: <strong>₹{activeRate.toFixed(2)}/kWh</strong>
           </div>
         </div>
 
@@ -212,8 +276,8 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
             style={{
               background: "#edf3eb",
               border: 0,
-              width: "30px",
-              height: "30px",
+              width: "32px",
+              height: "32px",
               borderRadius: "50%",
               color: "#37594b",
               fontWeight: 700,
@@ -221,13 +285,62 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "14px"
+              fontSize: "14px",
             }}
           >
             ✕
           </button>
         )}
       </div>
+
+      {/* Station Switcher (Choose any of 10 stations) */}
+      {allowStationSwitch && !sessionToken && (
+        <div
+          style={{
+            background: "#f8faf7",
+            border: "1px solid #e2ece0",
+            borderRadius: "10px",
+            padding: "10px 14px",
+            marginBottom: "16px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+            <span style={{ fontSize: "10px", fontWeight: 700, color: "#4f7360", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+              Selected Station (1 of 10 in Vellore Mesh)
+            </span>
+            <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 700 }}>
+              ⚡ 10 Stations Available
+            </span>
+          </div>
+
+          <select
+            value={nodeId}
+            onChange={(e) => {
+              setNodeId(e.target.value);
+              setSessionToken("");
+              setSettlementData(null);
+            }}
+            style={{
+              width: "100%",
+              background: "#ffffff",
+              border: "1px solid #c7d8c5",
+              borderRadius: "8px",
+              padding: "8px 12px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#19342f",
+              cursor: "pointer",
+              outline: "none",
+            }}
+          >
+            {VELLORE_STATIONS.map((st) => (
+              <option key={st.id} value={st.id}>
+                {st.name} — {st.place.split(",")[0]} (₹{st.rate.toFixed(2)}/kWh, {st.power})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Driver Wallet & Mode Selection Bar */}
       <div
@@ -239,7 +352,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
           border: "1px solid #e1ecde",
           borderRadius: "10px",
           padding: "10px 14px",
-          marginBottom: "20px"
+          marginBottom: "16px",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -263,7 +376,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
             border: "1px solid #d1ded0",
             borderRadius: "8px",
             padding: "4px 8px",
-            gap: "8px"
+            gap: "8px",
           }}
         >
           <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", fontWeight: 700, color: isSimulatorMode ? "#1f5e4c" : "#587265" }}>
@@ -286,15 +399,16 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
             border: "1px solid #dbe6d8",
             borderRadius: "12px",
             padding: "18px",
-            marginBottom: "16px"
+            marginBottom: "16px",
           }}
         >
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#1f5e4c", marginBottom: "12px", letterSpacing: "0.8px" }}>
-            STEP 1: LOCK CRYPTOGRAPHIC ESCROW
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "#1f5e4c", marginBottom: "10px", letterSpacing: "0.8px" }}>
+            STEP 1: LOCK ESCROW FOR {activeName.toUpperCase()}
           </div>
 
           <p style={{ margin: "0 0 14px", fontSize: "12px", color: "#547365", lineHeight: 1.5 }}>
-            Because the host charger operates completely offline in a cellular dead zone, your phone locks funds into escrow beforehand. The cloud signs a cryptographic voucher that authorizes the ESP32 relay to close.
+            Because the host charger operates offline in a cellular dead zone, funds are locked beforehand into an escrow voucher.
+            After charging completes, <strong>host earnings immediately reflect in {activeHost}&apos;s dashboard</strong>.
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: "12px", alignItems: "flex-end" }}>
@@ -316,7 +430,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
                       color: escrowAmount === amt ? "#1f5e4c" : "#496859",
                       fontWeight: 700,
                       fontSize: "13px",
-                      cursor: "pointer"
+                      cursor: "pointer",
                     }}
                   >
                     ₹{amt}
@@ -338,7 +452,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
                 fontWeight: 700,
                 cursor: walletBalance >= escrowAmount ? "pointer" : "not-allowed",
                 boxShadow: "0 2px 8px rgba(31, 94, 76, 0.25)",
-                height: "40px"
+                height: "40px",
               }}
             >
               {isFetchingToken ? "Locking..." : "Start Charging →"}
@@ -362,15 +476,15 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
             marginBottom: "16px",
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center"
+            alignItems: "center",
           }}
         >
           <div>
             <div style={{ fontSize: "11px", fontWeight: 700, color: "#196348" }}>
-              🔒 Escrow Locked: ₹{escrowAmount.toFixed(2)} (Max: {(escrowAmount / ratePerKwh).toFixed(2)} kWh)
+              🔒 Escrow Locked: ₹{escrowAmount.toFixed(2)} (Max: {(escrowAmount / activeRate).toFixed(2)} kWh)
             </div>
             <div style={{ fontSize: "10px", color: "#4f7e6b", fontFamily: "monospace", marginTop: "2px" }}>
-              Session: {sessionId}
+              Session: {sessionId} · Node: {nodeId}
             </div>
           </div>
           <button
@@ -387,7 +501,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
               padding: "4px 8px",
               fontSize: "10px",
               fontWeight: 700,
-              cursor: "pointer"
+              cursor: "pointer",
             }}
           >
             New Session
@@ -402,16 +516,16 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
             <BleSimulator
               nodeId={nodeId}
               sessionToken={sessionToken}
-              ratePerKwh={ratePerKwh}
-              targetKwh={8.42}
-              durationSeconds={8}
+              ratePerKwh={activeRate}
+              targetKwh={simulatedTargetKwh}
+              durationSeconds={6}
               onReceiptReceived={handleReceiptReceived}
             />
           ) : (
             <BleConnector
               nodeId={nodeId}
               sessionToken={sessionToken}
-              ratePerKwh={ratePerKwh}
+              ratePerKwh={activeRate}
               onReceiptReceived={handleReceiptReceived}
             />
           )}
@@ -427,7 +541,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
             border: "1.5px solid #86efac",
             borderRadius: "12px",
             padding: "18px",
-            boxShadow: "0 4px 14px rgba(22, 101, 52, 0.08)"
+            boxShadow: "0 4px 14px rgba(22, 101, 52, 0.08)",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
@@ -435,10 +549,10 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
               <span style={{ fontSize: "20px" }}>✅</span>
               <div>
                 <h4 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#166534" }}>
-                  Session Settled Successfully!
+                  Session Settled & Verified!
                 </h4>
                 <div style={{ fontSize: "11px", color: "#15803d" }}>
-                  Cloud Settlement via {settlementData.synced_via}
+                  Settled via {settlementData.synced_via} • Signed by {nodeId}
                 </div>
               </div>
             </div>
@@ -450,7 +564,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
                 fontWeight: 800,
                 padding: "4px 8px",
                 borderRadius: "6px",
-                letterSpacing: "0.5px"
+                letterSpacing: "0.5px",
               }}
             >
               HMAC VERIFIED ✓
@@ -467,7 +581,7 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
               border: "1px solid #bbf7d0",
               borderRadius: "8px",
               padding: "12px",
-              marginBottom: "12px"
+              marginBottom: "12px",
             }}
           >
             <div>
@@ -489,29 +603,61 @@ export const ChargingSessionManager: React.FC<ChargingSessionManagerProps> = ({
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "9px", color: "#15803d", fontWeight: 700 }}>REFUND TO WALLET</div>
+              <div style={{ fontSize: "9px", color: "#15803d", fontWeight: 700 }}>REFUND TO DRIVER</div>
               <div style={{ fontSize: "14px", fontWeight: 800, color: "#15803d" }}>
                 +₹{settlementData.refund_amount.toFixed(2)}
               </div>
             </div>
           </div>
 
-          {/* Live Updated Balance Callout */}
+          {/* Prominent Host Earnings Credit Callout with Direct Link */}
           <div
             style={{
+              background: "linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)",
+              border: "1.5px solid #4ade80",
+              borderRadius: "10px",
+              padding: "14px 16px",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              fontSize: "12px",
-              color: "#166534"
+              flexWrap: "wrap",
+              gap: "12px",
             }}
           >
-            <span>
-              Driver Wallet Updated: <strong>₹{settlementData.user_new_balance.toFixed(2)}</strong>
-            </span>
-            <span style={{ fontSize: "11px", color: "#4b5563" }}>
-              Host Credited: ₹{settlementData.host_earnings.toFixed(2)}
-            </span>
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#14532d", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>💰 HOST EARNINGS REFLECTED</span>
+                <span style={{ background: "#15803d", color: "#fff", fontSize: "9px", padding: "1px 6px", borderRadius: "10px" }}>
+                  LIVE
+                </span>
+              </div>
+              <div style={{ fontSize: "18px", fontWeight: 900, color: "#166534", marginTop: "2px" }}>
+                +₹{settlementData.host_earnings.toFixed(2)} credited to {activeHost}
+              </div>
+              <div style={{ fontSize: "11px", color: "#166534", marginTop: "2px" }}>
+                Station: <strong>{activeName}</strong> ({nodeId})
+              </div>
+            </div>
+
+            <Link
+              href={`/host?nodeId=${nodeId}`}
+              style={{
+                background: "#166534",
+                color: "#ffffff",
+                padding: "8px 16px",
+                borderRadius: "8px",
+                textDecoration: "none",
+                fontSize: "12px",
+                fontWeight: 700,
+                boxShadow: "0 2px 8px rgba(22, 101, 52, 0.3)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <span>View in Host Dashboard</span>
+              <span>📊 →</span>
+            </Link>
           </div>
         </div>
       )}

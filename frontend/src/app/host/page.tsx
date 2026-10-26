@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { VELLORE_STATIONS } from "@/lib/stationsData";
 
 interface NodeData {
   id: string;
@@ -17,6 +19,21 @@ interface NodeData {
   firmware_version: string;
 }
 
+interface TransactionData {
+  id: string;
+  session_id: string;
+  user_id: string;
+  node_id: string;
+  escrow_amount: number;
+  rate_per_kwh: number;
+  energy_consumed_kwh?: number;
+  actual_cost?: number;
+  refund_amount?: number;
+  status: string;
+  created_at: string;
+  settled_at?: string;
+}
+
 interface PayoutResult {
   node_id: string;
   payout_amount: number;
@@ -26,75 +43,128 @@ interface PayoutResult {
   message: string;
 }
 
-export default function HostDashboardPage() {
+function HostDashboardContent() {
+  const searchParams = useSearchParams();
+  const qNode = searchParams.get("nodeId") || searchParams.get("node") || "node_esp32_01";
+
   const [nodes, setNodes] = useState<NodeData[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<string>("RelayEV-Node-01");
+  const [selectedNodeId, setSelectedNodeId] = useState<string>(qNode);
   const [loading, setLoading] = useState<boolean>(true);
+  const [transactions, setTransactions] = useState<TransactionData[]>([]);
+  const [loadingTx, setLoadingTx] = useState<boolean>(false);
   const [payoutAmount, setPayoutAmount] = useState<number>(50);
-  const [payoutVpa, setPayoutVpa] = useState<string>("mohan@oksbi");
+  const [payoutVpa, setPayoutVpa] = useState<string>("rajesh@oksbi");
   const [isProcessingPayout, setIsProcessingPayout] = useState<boolean>(false);
   const [payoutSuccess, setPayoutSuccess] = useState<PayoutResult | null>(null);
   const [payoutError, setPayoutError] = useState<string>("");
-
-  // Register Form State
-  const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
-  const [newNodeId, setNewNodeId] = useState<string>("");
-  const [newNodeName, setNewNodeName] = useState<string>("");
-  const [newHostName, setNewHostName] = useState<string>("");
-  const [newLocation, setNewLocation] = useState<string>("");
-  const [newRate, setNewRate] = useState<number>(10.0);
-  const [isRegistering, setIsRegistering] = useState<boolean>(false);
-  const [registerSuccess, setRegisterSuccess] = useState<string>("");
+  const [lastCreditNotice, setLastCreditNotice] = useState<string>("");
 
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  useEffect(() => {
-    fetchNodes();
-  }, []);
+  // Build fallback nodes from 10 real stations
+  const fallbackNodes: NodeData[] = VELLORE_STATIONS.map((st) => ({
+    id: st.id,
+    name: st.name,
+    host_name: st.host,
+    location: st.place,
+    latitude: st.latitude,
+    longitude: st.longitude,
+    rate_per_kwh: st.rate,
+    max_power_kw: parseFloat(st.power) || 3.3,
+    host_wallet_balance: 0.0,
+    is_active: true,
+    firmware_version: "v1.2.0-mesh-pzem",
+  }));
 
-  const fetchNodes = async () => {
-    setLoading(true);
+  const fetchNodes = useCallback(async () => {
     try {
       const res = await fetch(`${backendUrl}/api/nodes`);
       if (res.ok) {
         const data: NodeData[] = await res.json();
-        setNodes(data);
-        if (data.length > 0 && !data.some((n) => n.id === selectedNodeId)) {
-          setSelectedNodeId(data[0].id);
+        if (data.length > 0) {
+          setNodes(data);
+          return;
         }
       }
+      setNodes(fallbackNodes);
     } catch {
-      // Fallback mock stations if backend offline
-      setNodes([
-        {
-          id: "RelayEV-Node-01",
-          name: "Mohan's Courtyard Node",
-          host_name: "Mohan Ram",
-          location: "Rampur Village, Plot 4",
-          rate_per_kwh: 10.0,
-          max_power_kw: 3.3,
-          host_wallet_balance: 168.4,
-          is_active: true,
-          firmware_version: "v1.2.0-mesh-pzem",
-        },
-        {
-          id: "RelayEV-Node-02",
-          name: "Kavita's Farmhouse Node",
-          host_name: "Kavita Devi",
-          location: "Old Highway Jn, Rampur",
-          rate_per_kwh: 12.0,
-          max_power_kw: 2.8,
-          host_wallet_balance: 96.0,
-          is_active: true,
-          firmware_version: "v1.2.0-mesh-pzem",
-        },
-      ]);
+      setNodes((prev) => (prev.length > 0 ? prev : fallbackNodes));
     } finally {
       setLoading(false);
     }
-  };
+  }, [backendUrl]);
 
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId) || nodes[0];
+  const fetchTransactions = useCallback(async (nodeId: string) => {
+    setLoadingTx(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/transactions?node_id=${nodeId}&limit=20`);
+      if (res.ok) {
+        const data = await res.json();
+        setTransactions(data);
+      }
+    } catch {
+      setTransactions([]);
+    } finally {
+      setLoadingTx(false);
+    }
+  }, [backendUrl]);
+
+  // Initial fetch and auto-selection
+  useEffect(() => {
+    fetchNodes();
+  }, [fetchNodes]);
+
+  useEffect(() => {
+    if (qNode) {
+      setSelectedNodeId(qNode);
+    }
+  }, [qNode]);
+
+  // Fetch transactions whenever selected node changes
+  useEffect(() => {
+    if (selectedNodeId) {
+      fetchTransactions(selectedNodeId);
+      setPayoutSuccess(null);
+      setPayoutError("");
+    }
+  }, [selectedNodeId, fetchTransactions]);
+
+  // Listen for live charging settlements from Charger and auto-poll
+  useEffect(() => {
+    const handleEarningsEvent = (e: any) => {
+      const detail = e.detail;
+      if (detail && detail.nodeId) {
+        setLastCreditNotice(
+          `⚡ Just received ₹${detail.hostEarnings.toFixed(2)} from session ${detail.sessionId || ""}!`
+        );
+        setTimeout(() => setLastCreditNotice(""), 8000);
+      }
+      fetchNodes();
+      if (selectedNodeId) fetchTransactions(selectedNodeId);
+    };
+
+    window.addEventListener("host-earnings-updated", handleEarningsEvent);
+
+    // Auto-poll every 4 seconds for live updates
+    const interval = setInterval(() => {
+      fetchNodes();
+      if (selectedNodeId) fetchTransactions(selectedNodeId);
+    }, 4000);
+
+    return () => {
+      window.removeEventListener("host-earnings-updated", handleEarningsEvent);
+      clearInterval(interval);
+    };
+  }, [fetchNodes, fetchTransactions, selectedNodeId]);
+
+  const activeNodes = nodes.length > 0 ? nodes : fallbackNodes;
+  const selectedNode = activeNodes.find((n) => n.id === selectedNodeId) || activeNodes[0];
+
+  // Total Host Earnings across all 10 stations
+  const totalNetworkEarnings = activeNodes.reduce(
+    (acc, n) => acc + (n.host_wallet_balance || 0),
+    0
+  );
 
   const handlePayout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +174,9 @@ export default function HostDashboardPage() {
       return;
     }
     if (payoutAmount > selectedNode.host_wallet_balance) {
-      setPayoutError(`Cannot withdraw more than host earnings (₹${selectedNode.host_wallet_balance.toFixed(2)})`);
+      setPayoutError(
+        `Cannot withdraw more than host earnings (₹${selectedNode.host_wallet_balance.toFixed(2)})`
+      );
       return;
     }
 
@@ -126,7 +198,6 @@ export default function HostDashboardPage() {
       if (res.ok) {
         const result: PayoutResult = await res.json();
         setPayoutSuccess(result);
-        // Update local node balance
         setNodes((prev) =>
           prev.map((n) =>
             n.id === selectedNode.id
@@ -139,7 +210,7 @@ export default function HostDashboardPage() {
         setPayoutError(err.detail || "Payout failed");
       }
     } catch {
-      // Offline simulated payout
+      // Local fallback
       const newBal = +(selectedNode.host_wallet_balance - payoutAmount).toFixed(2);
       const simulatedResult: PayoutResult = {
         node_id: selectedNode.id,
@@ -160,553 +231,382 @@ export default function HostDashboardPage() {
     }
   };
 
-  const handleRegisterNode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNodeId || !newNodeName || !newHostName || !newLocation) {
-      return;
-    }
-
-    setIsRegistering(true);
-    setRegisterSuccess("");
-
-    try {
-      const res = await fetch(`${backendUrl}/api/nodes/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: newNodeId,
-          name: newNodeName,
-          host_name: newHostName,
-          location: newLocation,
-          rate_per_kwh: newRate,
-          max_power_kw: 3.3,
-        }),
-      });
-
-      if (res.ok) {
-        const created: NodeData = await res.json();
-        setNodes((prev) => [...prev, created]);
-        setSelectedNodeId(created.id);
-        setRegisterSuccess(`Station ${created.name} registered on RelayEV mesh!`);
-        setTimeout(() => setShowRegisterModal(false), 2000);
-      }
-    } catch {
-      // Local fallback
-      const mockNode: NodeData = {
-        id: newNodeId,
-        name: newNodeName,
-        host_name: newHostName,
-        location: newLocation,
-        rate_per_kwh: newRate,
-        max_power_kw: 3.3,
-        host_wallet_balance: 0.0,
-        is_active: true,
-        firmware_version: "v1.2.0-mesh-pzem",
-      };
-      setNodes((prev) => [...prev, mockNode]);
-      setSelectedNodeId(mockNode.id);
-      setRegisterSuccess(`Station ${mockNode.name} registered locally!`);
-      setTimeout(() => setShowRegisterModal(false), 2000);
-    } finally {
-      setIsRegistering(false);
-    }
-  };
-
   return (
-    <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "28px 20px", color: "#f8fafc" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px", marginBottom: "28px" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-            <span style={{ fontSize: "28px" }}>📊</span>
-            <h1 style={{ fontSize: "26px", fontWeight: 800, margin: 0, letterSpacing: "-0.5px" }}>
+    <div className="w-full min-h-screen bg-slate-900 text-slate-100 pb-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {/* Top Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xl">📊</span>
+              <span className="text-xs uppercase tracking-wider font-bold text-emerald-400">
+                DECENTRALIZED HOST EARNINGS &amp; HARDWARE TELEMETRY
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Host Node Dashboard
             </h1>
-            <span style={{ background: "#059669", color: "#ecfdf5", padding: "3px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: 700 }}>
-              EARNINGS & HARDWARE
+            <p className="text-sm text-slate-400 mt-0.5">
+              Real-time settlement for 10 rural EV charging points. Earnings are automatically credited upon session completion.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                fetchNodes();
+                if (selectedNode) fetchTransactions(selectedNode.id);
+              }}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition"
+            >
+              <span>🔄</span>
+              <span>Refresh Live Balances</span>
+            </button>
+            <Link
+              href={`/charge?nodeId=${selectedNode?.id || "node_esp32_01"}`}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-900/40 transition"
+            >
+              <span>⚡ Test Charge This Node</span>
+              <span>↗</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Live Notification Banner if payment just received */}
+        {lastCreditNotice && (
+          <div className="my-4 bg-emerald-500/20 border-2 border-emerald-500 text-emerald-200 px-4 py-3 rounded-2xl flex items-center justify-between animate-pulse">
+            <div className="flex items-center gap-2 font-bold text-sm">
+              <span>🎉</span>
+              <span>{lastCreditNotice}</span>
+            </div>
+            <span className="text-xs font-mono bg-emerald-900/60 px-2.5 py-1 rounded-lg">
+              WALLET CREDITED ✓
             </span>
           </div>
-          <p style={{ margin: 0, fontSize: "14px", color: "#94a3b8" }}>
-            Monitor real-time host earnings, withdraw to UPI, and manage decentralized ₹1,500 rural charging hardware.
-          </p>
-        </div>
+        )}
 
-        <button
-          onClick={() => setShowRegisterModal(true)}
-          style={{
-            background: "linear-gradient(135deg, #10b981, #059669)",
-            color: "#ffffff",
-            border: "none",
-            borderRadius: "10px",
-            padding: "10px 18px",
-            fontSize: "13px",
-            fontWeight: 700,
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-          }}
-        >
-          + Register New Node
-        </button>
-      </div>
-
-      {/* Node Selector Tabs */}
-      <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "12px", marginBottom: "24px" }}>
-        {nodes.map((node) => {
-          const isSelected = selectedNode?.id === node.id;
-          return (
-            <button
-              key={node.id}
-              onClick={() => {
-                setSelectedNodeId(node.id);
-                setPayoutSuccess(null);
-                setPayoutError("");
-              }}
-              style={{
-                background: isSelected ? "rgba(16, 185, 129, 0.15)" : "rgba(30, 41, 59, 0.6)",
-                border: isSelected ? "2px solid #10b981" : "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "10px",
-                padding: "10px 16px",
-                color: isSelected ? "#34d399" : "#94a3b8",
-                cursor: "pointer",
-                textAlign: "left",
-                whiteSpace: "nowrap",
-                fontWeight: isSelected ? 700 : 500,
-                fontSize: "13px",
-              }}
-            >
-              <div style={{ color: "#fff", fontWeight: 700 }}>{node.name}</div>
-              <div style={{ fontSize: "11px", opacity: 0.8 }}>
-                {node.id} • ₹{node.host_wallet_balance.toFixed(2)}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {selectedNode && (
-        <>
-          {/* Key Metrics Cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "16px",
-              marginBottom: "28px",
-            }}
-          >
-            {/* Card 1: Host Earnings */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.2))",
-                border: "1px solid rgba(16, 185, 129, 0.3)",
-                borderRadius: "14px",
-                padding: "20px",
-              }}
-            >
-              <div style={{ fontSize: "12px", color: "#a7f3d0", fontWeight: 600, marginBottom: "6px" }}>
-                ACCUMULATED EARNINGS
-              </div>
-              <div style={{ fontSize: "32px", fontWeight: 800, color: "#34d399", letterSpacing: "-1px" }}>
-                ₹{selectedNode.host_wallet_balance.toFixed(2)}
-              </div>
-              <div style={{ fontSize: "11px", color: "#6ee7b7", marginTop: "4px" }}>
-                ✓ Ready for instant UPI settlement
-              </div>
+        {/* Network-wide Quick Metrics Summary */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
+          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              TOTAL NETWORK HOST EARNINGS
+            </span>
+            <div className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">
+              ₹{totalNetworkEarnings.toFixed(2)}
             </div>
-
-            {/* Card 2: Station Tariff */}
-            <div
-              style={{
-                background: "rgba(30, 41, 59, 0.5)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "14px",
-                padding: "20px",
-              }}
-            >
-              <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600, marginBottom: "6px" }}>
-                STATION TARIFF
-              </div>
-              <div style={{ fontSize: "32px", fontWeight: 800, color: "#f8fafc", letterSpacing: "-1px" }}>
-                ₹{selectedNode.rate_per_kwh.toFixed(2)}
-                <span style={{ fontSize: "14px", fontWeight: 500, color: "#94a3b8" }}> / kWh</span>
-              </div>
-              <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>
-                Max power: {selectedNode.max_power_kw} kW
-              </div>
-            </div>
-
-            {/* Card 3: Hardware Failsafe */}
-            <div
-              style={{
-                background: "rgba(30, 41, 59, 0.5)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "14px",
-                padding: "20px",
-              }}
-            >
-              <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600, marginBottom: "6px" }}>
-                NODE HARDWARE
-              </div>
-              <div style={{ fontSize: "18px", fontWeight: 700, color: "#34d399", marginTop: "6px" }}>
-                ⚡ 30A Relay Ready
-              </div>
-              <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>
-                PZEM-004T Meter • {selectedNode.firmware_version}
-              </div>
-            </div>
-
-            {/* Card 4: Location */}
-            <div
-              style={{
-                background: "rgba(30, 41, 59, 0.5)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "14px",
-                padding: "20px",
-              }}
-            >
-              <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600, marginBottom: "6px" }}>
-                HOST & LOCATION
-              </div>
-              <div style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc", marginTop: "4px" }}>
-                {selectedNode.host_name}
-              </div>
-              <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>
-                📍 {selectedNode.location}
-              </div>
-            </div>
+            <span className="text-xs text-slate-400 mt-1 block">
+              Cumulative balance across all 10 stations
+            </span>
           </div>
 
-          {/* Interactive Sections: Payout & Hardware Info */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "24px" }}>
-            {/* Left: Instant UPI Payout */}
-            <div
-              style={{
-                background: "rgba(30, 41, 59, 0.6)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                borderRadius: "16px",
-                padding: "24px",
-              }}
-            >
-              <h2 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>
-                💸 Instant UPI Host Payout
-              </h2>
-              <p style={{ fontSize: "12px", color: "#94a3b8", margin: "0 0 20px 0" }}>
-                Withdraw station charging earnings directly to your bank account via UPI.
-              </p>
+          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              ACTIVE MESH STATIONS
+            </span>
+            <div className="text-2xl sm:text-3xl font-black text-white">
+              10 / 10 Online
+            </div>
+            <span className="text-xs text-emerald-400 mt-1 block">
+              ✓ Vellore Corridor Hexagonal Core
+            </span>
+          </div>
 
-              <form onSubmit={handlePayout}>
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", fontSize: "12px", color: "#cbd5e1", marginBottom: "6px" }}>
-                    Withdrawal Amount (₹ INR)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max={selectedNode.host_wallet_balance}
-                    step="0.01"
-                    value={payoutAmount}
-                    onChange={(e) => setPayoutAmount(parseFloat(e.target.value) || 0)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      borderRadius: "8px",
-                      background: "rgba(15, 23, 42, 0.8)",
-                      border: "1px solid rgba(255, 255, 255, 0.15)",
-                      color: "#fff",
-                      fontSize: "15px",
-                      fontWeight: 600,
-                    }}
-                  />
-                  {/* Quick Select Buttons */}
-                  <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                    {[50, 100, 200].map((amt) => (
-                      <button
-                        key={amt}
-                        type="button"
-                        onClick={() => setPayoutAmount(amt)}
-                        style={{
-                          background: "rgba(255, 255, 255, 0.05)",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
-                          color: "#cbd5e1",
-                          borderRadius: "6px",
-                          padding: "4px 10px",
-                          fontSize: "11px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        ₹{amt}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setPayoutAmount(selectedNode.host_wallet_balance)}
-                      style={{
-                        background: "rgba(16, 185, 129, 0.15)",
-                        border: "1px solid rgba(16, 185, 129, 0.3)",
-                        color: "#34d399",
-                        borderRadius: "6px",
-                        padding: "4px 10px",
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Max (₹{selectedNode.host_wallet_balance.toFixed(2)})
-                    </button>
-                  </div>
-                </div>
+          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              CELLULAR SIM OPEX
+            </span>
+            <div className="text-2xl sm:text-3xl font-black text-white">
+              ₹0.00 / mo
+            </div>
+            <span className="text-xs text-slate-400 mt-1 block">
+              100% Offline WebBLE cryptographic sync
+            </span>
+          </div>
+        </div>
 
-                <div style={{ marginBottom: "20px" }}>
-                  <label style={{ display: "block", fontSize: "12px", color: "#cbd5e1", marginBottom: "6px" }}>
-                    Host UPI VPA Address
-                  </label>
-                  <input
-                    type="text"
-                    value={payoutVpa}
-                    onChange={(e) => setPayoutVpa(e.target.value)}
-                    placeholder="e.g. host@upi, mobile@paytm"
-                    required
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      borderRadius: "8px",
-                      background: "rgba(15, 23, 42, 0.8)",
-                      border: "1px solid rgba(255, 255, 255, 0.15)",
-                      color: "#fff",
-                      fontSize: "14px",
-                    }}
-                  />
-                </div>
+        {/* Station Selector Tabs (The 10 Real Vellore Stations) */}
+        <div className="mb-6">
+          <div className="text-xs uppercase font-bold tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+            <span>Select Station to View Earnings &amp; Hardware (10 Nodes)</span>
+            <span className="text-emerald-400 font-mono">Click any station tab</span>
+          </div>
 
-                {payoutError && (
-                  <div style={{ background: "#450a0a", border: "1px solid #dc2626", color: "#fca5a5", padding: "10px", borderRadius: "8px", fontSize: "12px", marginBottom: "16px" }}>
-                    ❌ {payoutError}
-                  </div>
-                )}
-
-                {payoutSuccess && (
-                  <div style={{ background: "#064e3b", border: "1px solid #059669", color: "#a7f3d0", padding: "12px", borderRadius: "8px", fontSize: "12px", marginBottom: "16px" }}>
-                    <div style={{ fontWeight: 700, marginBottom: "4px" }}>
-                      ✓ Payout Transferred via UPI!
-                    </div>
-                    <div>Reference: <code>{payoutSuccess.reference_id}</code></div>
-                    <div>Amount: ₹{payoutSuccess.payout_amount.toFixed(2)} to {payoutSuccess.payout_vpa}</div>
-                    <div>Remaining Balance: ₹{payoutSuccess.remaining_balance.toFixed(2)}</div>
-                  </div>
-                )}
-
+          <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-thin">
+            {activeNodes.map((node) => {
+              const isSelected = selectedNode?.id === node.id;
+              return (
                 <button
-                  type="submit"
-                  disabled={isProcessingPayout || selectedNode.host_wallet_balance <= 0}
-                  style={{
-                    width: "100%",
-                    background: selectedNode.host_wallet_balance > 0 ? "linear-gradient(135deg, #10b981, #059669)" : "#475569",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "10px",
-                    padding: "12px",
-                    fontWeight: 700,
-                    fontSize: "14px",
-                    cursor: selectedNode.host_wallet_balance > 0 ? "pointer" : "not-allowed",
-                  }}
+                  key={node.id}
+                  onClick={() => setSelectedNodeId(node.id)}
+                  className={`shrink-0 text-left px-4 py-3 rounded-2xl border transition ${
+                    isSelected
+                      ? "bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10"
+                      : "bg-slate-800/80 hover:bg-slate-750 border-slate-700/80 text-slate-300"
+                  }`}
                 >
-                  {isProcessingPayout ? "Transferring via UPI..." : `Withdraw ₹${payoutAmount.toFixed(2)} to UPI`}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isSelected ? "bg-emerald-400 animate-ping" : "bg-emerald-500"
+                      }`}
+                    />
+                    <span className="text-xs font-bold text-white line-clamp-1">{node.name}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 flex items-center justify-between gap-3">
+                    <span className="font-mono text-[10px] text-slate-500">{node.id}</span>
+                    <span className="font-mono font-bold text-emerald-400">
+                      ₹{node.host_wallet_balance.toFixed(2)}
+                    </span>
+                  </div>
                 </button>
-              </form>
-            </div>
-
-            {/* Right: Zero-OPEX Rural Station Hardware Architecture */}
-            <div
-              style={{
-                background: "rgba(30, 41, 59, 0.6)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                borderRadius: "16px",
-                padding: "24px",
-              }}
-            >
-              <h2 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>
-                ⚡ ₹1,500 Hardware Node Telemetry
-              </h2>
-              <p style={{ fontSize: "12px", color: "#94a3b8", margin: "0 0 16px 0" }}>
-                Unlike commercial DC chargers costing ₹150,000+ with recurring SIM bills, RelayEV runs offline:
-              </p>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                <div style={{ background: "rgba(15, 23, 42, 0.7)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 600 }}>
-                    <span>PZEM-004T Energy Meter</span>
-                    <span style={{ color: "#34d399" }}>CALIBRATED</span>
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-                    Modbus-RTU UART on GPIO 16/17 • Measures 0-100A AC
-                  </div>
-                </div>
-
-                <div style={{ background: "rgba(15, 23, 42, 0.7)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 600 }}>
-                    <span>30A Heavy-Duty Relay</span>
-                    <span style={{ color: "#34d399" }}>FAILSAFE OPEN</span>
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-                    Optoisolated GPIO 23 • Closes only upon JWT escrow authorization
-                  </div>
-                </div>
-
-                <div style={{ background: "rgba(15, 23, 42, 0.7)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 600 }}>
-                    <span>Cryptographic Engine</span>
-                    <span style={{ color: "#34d399" }}>mbedtls SHA-256</span>
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-                    Generates hardware HMAC signature on cutoff • Tamper-resistant
-                  </div>
-                </div>
-
-                <div style={{ background: "rgba(15, 23, 42, 0.7)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 600 }}>
-                    <span>Drive-By Data Mule Mesh</span>
-                    <span style={{ color: "#60a5fa" }}>ACTIVE</span>
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-                    SPIFFS flash ledger buffers receipts for passing cars
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Modal: Register New Node */}
-      {showRegisterModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.8)",
-            display: "grid",
-            placeItems: "center",
-            padding: "20px",
-            zIndex: 100,
-          }}
-        >
-          <div
-            style={{
-              background: "#1e293b",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
-              borderRadius: "16px",
-              padding: "24px",
-              width: "100%",
-              maxWidth: "460px",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800 }}>Register New Host Station</h3>
-              <button
-                onClick={() => setShowRegisterModal(false)}
-                style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleRegisterNode}>
-              <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>
-                  Node BLE ID (e.g. RelayEV-Node-05)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="RelayEV-Node-05"
-                  value={newNodeId}
-                  onChange={(e) => setNewNodeId(e.target.value)}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", background: "#0f172a", border: "1px solid #334155", color: "#fff" }}
-                />
-              </div>
-
-              <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>
-                  Station Display Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Verma Solar Point"
-                  value={newNodeName}
-                  onChange={(e) => setNewNodeName(e.target.value)}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", background: "#0f172a", border: "1px solid #334155", color: "#fff" }}
-                />
-              </div>
-
-              <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>
-                  Host Owner Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Suresh Verma"
-                  value={newHostName}
-                  onChange={(e) => setNewHostName(e.target.value)}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", background: "#0f172a", border: "1px solid #334155", color: "#fff" }}
-                />
-              </div>
-
-              <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>
-                  Milestone / Address
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. East Village Well Road"
-                  value={newLocation}
-                  onChange={(e) => setNewLocation(e.target.value)}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", background: "#0f172a", border: "1px solid #334155", color: "#fff" }}
-                />
-              </div>
-
-              <div style={{ marginBottom: "18px" }}>
-                <label style={{ display: "block", fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>
-                  Tariff in INR (₹/kWh)
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  required
-                  value={newRate}
-                  onChange={(e) => setNewRate(parseFloat(e.target.value) || 10.0)}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", background: "#0f172a", border: "1px solid #334155", color: "#fff" }}
-                />
-              </div>
-
-              {registerSuccess && (
-                <div style={{ background: "#064e3b", color: "#a7f3d0", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "12px" }}>
-                  ✓ {registerSuccess}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isRegistering}
-                style={{
-                  width: "100%",
-                  background: "linear-gradient(135deg, #10b981, #059669)",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "8px",
-                  padding: "10px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                {isRegistering ? "Registering..." : "Add Station to Mesh"}
-              </button>
-            </form>
+              );
+            })}
           </div>
         </div>
-      )}
+
+        {selectedNode && (
+          <>
+            {/* Primary Metrics Grid for Selected Node */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              {/* Card 1: Live Accumulated Earnings */}
+              <div className="bg-gradient-to-br from-emerald-950/40 to-slate-850 border-2 border-emerald-500/60 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>ACCUMULATED EARNINGS</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                </div>
+                <div className="text-3xl font-black text-emerald-300 font-mono tracking-tight my-1">
+                  ₹{selectedNode.host_wallet_balance.toFixed(2)}
+                </div>
+                <div className="text-xs text-emerald-400 font-medium">
+                  ✓ Available for instant UPI withdrawal
+                </div>
+              </div>
+
+              {/* Card 2: Station Tariff & Power */}
+              <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  STATION TARIFF
+                </div>
+                <div className="text-3xl font-black text-white tracking-tight my-1">
+                  ₹{selectedNode.rate_per_kwh.toFixed(2)}
+                  <span className="text-sm font-normal text-slate-400"> / kWh</span>
+                </div>
+                <div className="text-xs text-slate-400">
+                  Power: <strong>{selectedNode.max_power_kw} kW</strong> (16A / 32A)
+                </div>
+              </div>
+
+              {/* Card 3: Node Hardware */}
+              <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  HARDWARE &amp; SAFETY
+                </div>
+                <div className="text-lg font-bold text-emerald-400 my-1">
+                  ⚡ 30A Failsafe Relay
+                </div>
+                <div className="text-xs text-slate-400">
+                  PZEM-004T Meter • ESP32-S3 Mesh
+                </div>
+              </div>
+
+              {/* Card 4: Host Details */}
+              <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  HOST OPERATOR
+                </div>
+                <div className="text-base font-bold text-white my-1 line-clamp-1">
+                  {selectedNode.host_name}
+                </div>
+                <div className="text-xs text-slate-400 line-clamp-1">
+                  📍 {selectedNode.location}
+                </div>
+              </div>
+            </div>
+
+            {/* Two Column Section: UPI Payout & Recent Sessions */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Column: Instant UPI Withdrawal */}
+              <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 shadow-xl">
+                <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                  <span>💸 Instant UPI Host Payout</span>
+                </h2>
+                <p className="text-xs text-slate-400 mb-4">
+                  Withdraw earned station profits directly to your registered bank account via UPI.
+                </p>
+
+                <form onSubmit={handlePayout} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      Withdrawal Amount (₹ INR)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedNode.host_wallet_balance}
+                      step="0.01"
+                      value={payoutAmount}
+                      onChange={(e) => setPayoutAmount(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-3.5 py-2.5 text-sm font-bold focus:outline-none focus:border-emerald-500"
+                    />
+
+                    {/* Quick Preset Buttons */}
+                    <div className="flex gap-2 mt-2">
+                      {[50, 100, 200].map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setPayoutAmount(amt)}
+                          className="text-xs bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1 rounded-lg transition"
+                        >
+                          ₹{amt}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setPayoutAmount(selectedNode.host_wallet_balance)}
+                        className="text-xs bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 px-3 py-1 rounded-lg font-bold transition"
+                      >
+                        Max (₹{selectedNode.host_wallet_balance.toFixed(2)})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      Host UPI VPA Address
+                    </label>
+                    <input
+                      type="text"
+                      value={payoutVpa}
+                      onChange={(e) => setPayoutVpa(e.target.value)}
+                      placeholder="e.g. host@oksbi, mobile@paytm"
+                      required
+                      className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  {payoutError && (
+                    <div className="bg-red-500/20 border border-red-500/40 text-red-300 px-3.5 py-2.5 rounded-xl text-xs">
+                      ❌ {payoutError}
+                    </div>
+                  )}
+
+                  {payoutSuccess && (
+                    <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 px-3.5 py-2.5 rounded-xl text-xs space-y-1">
+                      <div className="font-bold">✓ Payout Processed Successfully!</div>
+                      <div>Ref: <code>{payoutSuccess.reference_id}</code></div>
+                      <div>Transferred: ₹{payoutSuccess.payout_amount.toFixed(2)} to {payoutSuccess.payout_vpa}</div>
+                      <div>New Balance: ₹{payoutSuccess.remaining_balance.toFixed(2)}</div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isProcessingPayout || selectedNode.host_wallet_balance <= 0}
+                    className={`w-full py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition ${
+                      selectedNode.host_wallet_balance > 0
+                        ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40 cursor-pointer"
+                        : "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
+                    }`}
+                  >
+                    {isProcessingPayout
+                      ? "Transferring via UPI..."
+                      : `Withdraw ₹${payoutAmount.toFixed(2)} to UPI`}
+                  </button>
+                </form>
+              </div>
+
+              {/* Right Column: Recent Charging Sessions & Earnings Log */}
+              <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>⚡ Recent Charging Sessions</span>
+                    </h2>
+                    <span className="text-xs text-emerald-400 font-mono">
+                      {transactions.length} records
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-4">
+                    Cryptographically settled sessions logged on node <code>{selectedNode.id}</code>.
+                  </p>
+
+                  {loadingTx ? (
+                    <div className="text-xs text-slate-400 animate-pulse py-8 text-center">
+                      Loading session ledger...
+                    </div>
+                  ) : transactions.length === 0 ? (
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 text-center text-xs text-slate-400">
+                      <p className="mb-2">No charging sessions settled yet for this node.</p>
+                      <Link
+                        href={`/charge?nodeId=${selectedNode.id}`}
+                        className="inline-block bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg transition"
+                      >
+                        ⚡ Start a test charge now
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1 scrollbar-thin">
+                      {transactions.map((tx) => (
+                        <div
+                          key={tx.session_id || tx.id}
+                          className="bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex items-center justify-between text-xs transition"
+                        >
+                          <div>
+                            <div className="font-mono font-bold text-white text-[11px]">
+                              {tx.session_id}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {tx.settled_at
+                                ? new Date(tx.settled_at).toLocaleTimeString()
+                                : "Active Session"} • Driver: {tx.user_id}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className="font-black text-emerald-400 font-mono text-sm">
+                              +₹{(tx.actual_cost || 0).toFixed(2)}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {(tx.energy_consumed_kwh || 0).toFixed(2)} kWh
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
+                  <span>Cryptographic Proof: HMAC-SHA256</span>
+                  <Link
+                    href={`/charge?nodeId=${selectedNode.id}`}
+                    className="text-emerald-400 hover:text-emerald-300 font-bold"
+                  >
+                    Launch Charger ⚡
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+export default function HostDashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-8">
+          <div className="text-emerald-400 text-sm font-mono animate-pulse">
+            Loading Host Dashboard...
+          </div>
+        </div>
+      }
+    >
+      <HostDashboardContent />
+    </Suspense>
   );
 }
