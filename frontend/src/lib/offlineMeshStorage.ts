@@ -30,6 +30,20 @@ export interface CachedUser {
   cachedAt: number;
 }
 
+/**
+ * Helper to dynamically determine the backend API base URL
+ */
+function resolveBackendUrl(preferredUrl?: string): string {
+  if (preferredUrl) return preferredUrl;
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined" && window.location.hostname) {
+    const proto = window.location.protocol;
+    const host = window.location.hostname;
+    return `${proto}//${host}:8000`;
+  }
+  return "http://localhost:8000";
+}
+
 export class OfflineMeshStorage {
   /**
    * Save driver profile for offline retrieval
@@ -47,7 +61,7 @@ export class OfflineMeshStorage {
       const updated = { ...existing, ...user, cachedAt: Date.now() };
       localStorage.setItem(STORAGE_KEYS.CACHED_USER, JSON.stringify(updated));
     } catch (e) {
-      console.error("[OfflineStorage] Failed to save cached user:", e);
+      console.warn("[OfflineStorage] Failed to save cached user:", e);
     }
   }
 
@@ -60,7 +74,7 @@ export class OfflineMeshStorage {
       const data = localStorage.getItem(STORAGE_KEYS.CACHED_USER);
       if (data) return JSON.parse(data);
     } catch (e) {
-      console.error("[OfflineStorage] Failed to read cached user:", e);
+      console.warn("[OfflineStorage] Failed to read cached user:", e);
     }
     return {
       id: "user_88",
@@ -75,11 +89,13 @@ export class OfflineMeshStorage {
    * Enqueue a signed charging receipt that was received over BLE while offline
    */
   static enqueueOfflineReceipt(receipt: ChargingReceipt): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !receipt || !receipt.session_id) return;
     try {
       const queue = this.getQueuedReceipts();
+      const sid = receipt.session_id;
+
       // Avoid duplicate enqueue
-      if (!queue.some((q) => q.receipt.session_id === receipt.session_id)) {
+      if (!queue.some((q) => q.receipt?.session_id === sid)) {
         queue.push({
           receipt,
           queuedAt: Date.now(),
@@ -87,10 +103,10 @@ export class OfflineMeshStorage {
           status: "PENDING",
         });
         localStorage.setItem(STORAGE_KEYS.OFFLINE_RECEIPT_QUEUE, JSON.stringify(queue));
-        console.log(`[OfflineStorage] Receipt for ${receipt.session_id} saved to offline queue.`);
+        console.log(`[OfflineStorage] Receipt for ${sid} saved to offline queue.`);
       }
     } catch (e) {
-      console.error("[OfflineStorage] Failed to enqueue receipt:", e);
+      console.warn("[OfflineStorage] Failed to enqueue receipt:", e);
     }
   }
 
@@ -101,9 +117,27 @@ export class OfflineMeshStorage {
     if (typeof window === "undefined") return [];
     try {
       const data = localStorage.getItem(STORAGE_KEYS.OFFLINE_RECEIPT_QUEUE);
-      if (data) return JSON.parse(data);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+          // Normalize queue to gracefully handle direct receipts or wrapped items
+          return parsed
+            .filter((item) => item && (item.receipt?.session_id || item.session_id))
+            .map((item) => {
+              if (item.receipt && item.receipt.session_id) {
+                return item;
+              }
+              return {
+                receipt: item as ChargingReceipt,
+                queuedAt: item.queuedAt || Date.now(),
+                attempts: item.attempts || 0,
+                status: item.status || "PENDING",
+              };
+            });
+        }
+      }
     } catch (e) {
-      console.error("[OfflineStorage] Failed to read receipt queue:", e);
+      console.warn("[OfflineStorage] Failed to read receipt queue:", e);
     }
     return [];
   }
@@ -112,14 +146,14 @@ export class OfflineMeshStorage {
    * Remove a successfully synced receipt from queue
    */
   static removeQueuedReceipt(sessionId: string): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !sessionId) return;
     try {
-      let queue = this.getQueuedReceipts();
-      queue = queue.filter((q) => q.receipt.session_id !== sessionId);
-      localStorage.setItem(STORAGE_KEYS.OFFLINE_RECEIPT_QUEUE, JSON.stringify(queue));
+      const queue = this.getQueuedReceipts();
+      const filtered = queue.filter((q) => q.receipt?.session_id !== sessionId);
+      localStorage.setItem(STORAGE_KEYS.OFFLINE_RECEIPT_QUEUE, JSON.stringify(filtered));
       console.log(`[OfflineStorage] Removed synced receipt ${sessionId} from queue.`);
     } catch (e) {
-      console.error("[OfflineStorage] Failed to remove receipt:", e);
+      console.warn("[OfflineStorage] Failed to remove receipt:", e);
     }
   }
 
@@ -127,50 +161,73 @@ export class OfflineMeshStorage {
    * Flush and synchronize all queued offline receipts with the backend cloud
    */
   static async syncQueuedReceipts(
-    apiBaseUrl: string = "http://localhost:8000"
+    apiBaseUrl?: string
   ): Promise<{ synced: number; failed: number; newBalance?: number }> {
     const queue = this.getQueuedReceipts();
     if (queue.length === 0) return { synced: 0, failed: 0 };
 
-    console.log(`[OfflineStorage] 🚀 Cellular connection restored! Flushing ${queue.length} offline receipts...`);
+    const targetUrl = resolveBackendUrl(apiBaseUrl);
+    console.log(`[OfflineStorage] 🚀 Cellular connection active! Flushing ${queue.length} offline receipts to ${targetUrl}...`);
     let synced = 0;
     let failed = 0;
     let latestBalance: number | undefined;
 
     for (const item of queue) {
+      const receipt = item?.receipt;
+      if (!receipt || !receipt.session_id) {
+        // Discard malformed item
+        continue;
+      }
+
       try {
-        const res = await fetch(`${apiBaseUrl}/api/charge/stop`, {
+        const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
+
+        const res = await fetch(`${targetUrl}/api/charge/stop`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller ? controller.signal : undefined,
           body: JSON.stringify({
-            session_id: item.receipt.session_id,
-            node_id: item.receipt.node_id,
-            user_id: item.receipt.user_id,
-            energy_consumed_kwh: item.receipt.energy_consumed_kwh,
-            actual_cost: item.receipt.actual_cost,
-            node_signature: item.receipt.node_signature,
-            timestamp: item.receipt.timestamp,
-            nonce: item.receipt.nonce,
+            session_id: receipt.session_id,
+            node_id: receipt.node_id || "node_esp32_01",
+            user_id: receipt.user_id || "user_88",
+            energy_consumed_kwh: receipt.energy_consumed_kwh || 0.0,
+            actual_cost: receipt.actual_cost || 0.0,
+            node_signature: receipt.node_signature || "",
+            timestamp: receipt.timestamp || Math.floor(Date.now() / 1000),
+            nonce: receipt.nonce || `NONCE-${Date.now()}`,
             is_mule_sync: false,
           }),
         });
 
+        if (timeoutId) clearTimeout(timeoutId);
+
         if (res.ok) {
           const data = await res.json();
-          this.removeQueuedReceipt(item.receipt.session_id);
+          this.removeQueuedReceipt(receipt.session_id);
           synced++;
           if (data.user_new_balance !== undefined) {
             latestBalance = data.user_new_balance;
             this.saveCachedUser({ walletBalance: latestBalance });
           }
-          console.log(`[OfflineStorage] ✓ Successfully settled ${item.receipt.session_id}`);
+          console.log(`[OfflineStorage] ✓ Successfully settled ${receipt.session_id}`);
         } else {
+          // If already settled, remove to prevent endless retries
+          if (res.status === 400 || res.status === 409) {
+            const errJson = await res.json().catch(() => ({}));
+            if (errJson?.detail && errJson.detail.includes("already been processed")) {
+              this.removeQueuedReceipt(receipt.session_id);
+              synced++;
+              continue;
+            }
+          }
           failed++;
-          item.attempts += 1;
+          item.attempts = (item.attempts || 0) + 1;
           item.status = "FAILED";
         }
-      } catch (err) {
-        console.error(`[OfflineStorage] Network error syncing ${item.receipt.session_id}:`, err);
+      } catch (err: any) {
+        // Graceful non-blocking catch for network drops / CORS / timeouts
+        console.warn(`[OfflineStorage] Network unavailable for ${receipt.session_id}:`, err?.message || err);
         failed++;
       }
     }
