@@ -427,3 +427,176 @@ class DatabaseManager:
             "active_nodes_count": active_nodes,
             "total_transactions_count": total_tx
         }
+
+    # =========================================================================
+    # PERSON 2: CLOUD ESCROW SWEEPER & MESH ANALYTICS
+    # =========================================================================
+
+    @staticmethod
+    def sweep_expired_escrows() -> Tuple[int, float, List[str]]:
+        """
+        Scans for all active sessions with status 'ESCROW_LOCKED' whose expires_at timestamp has passed.
+        Marks them as 'EXPIRED', restores 100% of escrow back to driver wallet, and records audit ledger logs.
+        Returns: (swept_count, total_refunded_inr, swept_session_ids)
+        """
+        now_dt = datetime.now(timezone.utc)
+        now_iso = now_dt.isoformat()
+        conn = DatabaseManager.get_connection()
+
+        rows = conn.execute("""
+        SELECT session_id, user_id, escrow_amount, expires_at 
+        FROM transactions 
+        WHERE status = 'ESCROW_LOCKED'
+        """).fetchall()
+
+        swept_sessions: List[str] = []
+        total_refunded = 0.0
+
+        for r in rows:
+            is_expired = False
+            expires_at_str = r["expires_at"]
+            try:
+                # Handle ISO 8601 string or numeric timestamp
+                if "T" in str(expires_at_str):
+                    exp_dt = datetime.fromisoformat(expires_at_str)
+                    if exp_dt.tzinfo is None:
+                        exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                    if now_dt >= exp_dt:
+                        is_expired = True
+                else:
+                    exp_epoch = float(expires_at_str)
+                    if now_dt.timestamp() >= exp_epoch:
+                        is_expired = True
+            except Exception:
+                is_expired = False
+
+            if is_expired:
+                session_id = r["session_id"]
+                user_id = r["user_id"]
+                escrow_amt = round(float(r["escrow_amount"]), 2)
+
+                # 1. Update transaction status
+                conn.execute("""
+                UPDATE transactions 
+                SET status = 'EXPIRED', refund_amount = ?, settled_at = ?
+                WHERE session_id = ?
+                """, (escrow_amt, now_iso, session_id))
+
+                # 2. Refund driver wallet
+                u_row = conn.execute("SELECT wallet_balance FROM users WHERE id = ?", (user_id,)).fetchone()
+                current_bal = u_row["wallet_balance"] if u_row else 0.0
+                new_bal = round(current_bal + escrow_amt, 2)
+                conn.execute("UPDATE users SET wallet_balance = ?, updated_at = ? WHERE id = ?", (new_bal, now_iso, user_id))
+
+                # 3. Log audit ledger
+                log_id = f"LOG-SWEEP-{uuid.uuid4().hex[:8].upper()}"
+                conn.execute("""
+                INSERT INTO wallet_audit_logs (id, user_id, change_type, amount, balance_after, reference_id, timestamp)
+                VALUES (?, ?, 'ESCROW_EXPIRED_REFUND', ?, ?, ?, ?)
+                """, (log_id, user_id, escrow_amt, new_bal, session_id, now_iso))
+
+                swept_sessions.append(session_id)
+                total_refunded = round(total_refunded + escrow_amt, 2)
+
+        conn.commit()
+        conn.close()
+        return len(swept_sessions), total_refunded, swept_sessions
+
+    @staticmethod
+    def get_mesh_analytics() -> Dict[str, Any]:
+        """
+        Computes network-wide cloud telemetry and business metrics across all nodes and sessions.
+        """
+        conn = DatabaseManager.get_connection()
+        
+        # Transactions stats
+        tx_stats = conn.execute("""
+        SELECT 
+            COUNT(*) as total_count,
+            COALESCE(SUM(CASE WHEN status IN ('SETTLED', 'MULE_SYNCED') THEN energy_consumed_kwh ELSE 0 END), 0.0) as total_kwh,
+            COALESCE(SUM(CASE WHEN status IN ('SETTLED', 'MULE_SYNCED') THEN actual_cost ELSE 0 END), 0.0) as total_gmv,
+            COALESCE(SUM(mule_reward_inr), 0.0) as total_mule_bounties,
+            COALESCE(SUM(CASE WHEN status IN ('SETTLED', 'MULE_SYNCED') THEN 1 ELSE 0 END), 0) as settled_count,
+            COALESCE(SUM(CASE WHEN status = 'EXPIRED' THEN 1 ELSE 0 END), 0) as expired_count,
+            COALESCE(SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END), 0) as cancelled_count,
+            COALESCE(SUM(CASE WHEN status = 'ESCROW_LOCKED' THEN 1 ELSE 0 END), 0) as active_escrows_count
+        FROM transactions
+        """).fetchone()
+
+        # Nodes stats
+        node_stats = conn.execute("""
+        SELECT 
+            COUNT(*) as active_count,
+            COALESCE(SUM(host_wallet_balance), 0.0) as total_host_balance
+        FROM nodes WHERE is_active = 1
+        """).fetchone()
+
+        conn.close()
+
+        total_tx = tx_stats["total_count"] if tx_stats else 0
+        settled_tx = tx_stats["settled_count"] if tx_stats else 0
+        total_kwh = round(float(tx_stats["total_kwh"]), 3) if tx_stats else 0.0
+        total_gmv = round(float(tx_stats["total_gmv"]), 2) if tx_stats else 0.0
+        total_mule = round(float(tx_stats["total_mule_bounties"]), 2) if tx_stats else 0.0
+        total_host_balance = round(float(node_stats["total_host_balance"]), 2) if node_stats else 0.0
+        active_nodes = node_stats["active_count"] if node_stats else 0
+
+        avg_kwh = round(total_kwh / settled_tx, 2) if settled_tx > 0 else 0.0
+        avg_cost = round(total_gmv / settled_tx, 2) if settled_tx > 0 else 0.0
+
+        return {
+            "total_kwh_delivered": total_kwh,
+            "total_gmv_inr": total_gmv,
+            "total_host_payouts_inr": total_host_balance,
+            "total_mule_bounties_inr": total_mule,
+            "active_nodes_count": active_nodes,
+            "total_transactions_count": total_tx,
+            "settled_transactions_count": settled_tx,
+            "expired_transactions_count": tx_stats["expired_count"] if tx_stats else 0,
+            "cancelled_transactions_count": tx_stats["cancelled_count"] if tx_stats else 0,
+            "active_escrows_count": tx_stats["active_escrows_count"] if tx_stats else 0,
+            "avg_kwh_per_session": avg_kwh,
+            "avg_cost_per_session": avg_cost
+        }
+
+    @staticmethod
+    def get_node_analytics(node_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Aggregates performance analytics for a single specific charging node.
+        """
+        node = DatabaseManager.get_node(node_id)
+        if not node:
+            return None
+
+        conn = DatabaseManager.get_connection()
+        stats = conn.execute("""
+        SELECT 
+            COUNT(*) as total_sessions,
+            COALESCE(SUM(CASE WHEN status IN ('SETTLED', 'MULE_SYNCED') THEN 1 ELSE 0 END), 0) as settled_sessions,
+            COALESCE(SUM(CASE WHEN status IN ('SETTLED', 'MULE_SYNCED') THEN energy_consumed_kwh ELSE 0 END), 0.0) as total_kwh,
+            COALESCE(SUM(CASE WHEN status IN ('SETTLED', 'MULE_SYNCED') THEN actual_cost ELSE 0 END), 0.0) as total_revenue
+        FROM transactions
+        WHERE node_id = ?
+        """, (node["id"],)).fetchone()
+        conn.close()
+
+        total_sessions = stats["total_sessions"] if stats else 0
+        settled_sessions = stats["settled_sessions"] if stats else 0
+        total_kwh = round(float(stats["total_kwh"]), 3) if stats else 0.0
+        total_revenue = round(float(stats["total_revenue"]), 2) if stats else 0.0
+
+        return {
+            "node_id": node["id"],
+            "node_name": node["name"],
+            "host_name": node["host_name"],
+            "location": node["location"],
+            "rate_per_kwh": node["rate_per_kwh"],
+            "host_wallet_balance": node["host_wallet_balance"],
+            "total_sessions": total_sessions,
+            "settled_sessions": settled_sessions,
+            "total_kwh_delivered": total_kwh,
+            "total_revenue_inr": total_revenue,
+            "is_active": bool(node["is_active"]),
+            "uptime_status": "ONLINE_HEALTHY" if node["is_active"] else "OFFLINE_MAINTENANCE"
+        }
+

@@ -119,3 +119,91 @@ VALUES
     ('RelayEV-Node-03', 'Village Co-op Charging Hub', 'Rampur Panchayat', NULL, 'Market Road, Rampur', 28.6110, 77.2020, 8.50, 3.50, 0.00, 'relay_ev_hardware_master_secret_2026'),
     ('RelayEV-Node-04', 'Sharma Dhaba Fast Tap', 'Ramesh Sharma', NULL, 'NH-48 Milestone 42', 28.6250, 77.2280, 14.00, 3.30, 0.00, 'relay_ev_hardware_master_secret_2026')
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
+-- 6. PERSON 2: ADVANCED ANALYTICS VIEWS & STORED RPC FUNCTIONS
+-- ============================================================================
+
+-- View: Station performance summary
+CREATE OR REPLACE VIEW view_node_performance AS
+SELECT 
+    n.id AS node_id,
+    n.name AS node_name,
+    n.host_name,
+    n.rate_per_kwh,
+    n.host_wallet_balance,
+    COUNT(t.id) AS total_sessions,
+    COUNT(CASE WHEN t.status IN ('SETTLED', 'MULE_SYNCED') THEN 1 END) AS settled_sessions,
+    COALESCE(SUM(CASE WHEN t.status IN ('SETTLED', 'MULE_SYNCED') THEN t.energy_consumed_kwh ELSE 0 END), 0) AS total_kwh_delivered,
+    COALESCE(SUM(CASE WHEN t.status IN ('SETTLED', 'MULE_SYNCED') THEN t.actual_cost ELSE 0 END), 0) AS total_revenue
+FROM nodes n
+LEFT JOIN transactions t ON n.id = t.node_id
+GROUP BY n.id, n.name, n.host_name, n.rate_per_kwh, n.host_wallet_balance;
+
+-- View: Data mule mesh contributions
+CREATE OR REPLACE VIEW view_mule_contributions AS
+SELECT 
+    u.id AS mule_user_id,
+    u.name AS mule_name,
+    COUNT(t.id) AS vouchers_synced,
+    COALESCE(SUM(t.mule_reward_inr), 0) AS total_bounties_earned
+FROM users u
+JOIN transactions t ON u.id = t.mule_user_id
+GROUP BY u.id, u.name;
+
+-- Stored RPC: Sweep expired unredeemed escrows & auto-refund
+CREATE OR REPLACE FUNCTION rpc_sweep_expired_escrows()
+RETURNS json AS $$
+DECLARE
+    swept_count INT := 0;
+    total_refund NUMERIC(10, 2) := 0.00;
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT session_id, user_id, escrow_amount 
+        FROM transactions 
+        WHERE status = 'ESCROW_LOCKED' AND expires_at < NOW()
+    LOOP
+        UPDATE transactions 
+        SET status = 'EXPIRED', refund_amount = r.escrow_amount, settled_at = NOW()
+        WHERE session_id = r.session_id;
+
+        UPDATE users
+        SET wallet_balance = wallet_balance + r.escrow_amount, updated_at = NOW()
+        WHERE id = r.user_id;
+
+        INSERT INTO wallet_audit_logs (id, user_id, change_type, amount, balance_after, reference_id, timestamp)
+        SELECT 'LOG-SWEEP-' || SUBSTR(MD5(RANDOM()::TEXT), 1, 8), r.user_id, 'ESCROW_EXPIRED_REFUND', r.escrow_amount, wallet_balance, r.session_id, NOW()
+        FROM users WHERE id = r.user_id;
+
+        swept_count := swept_count + 1;
+        total_refund := total_refund + r.escrow_amount;
+    END LOOP;
+
+    RETURN json_build_object(
+        'status', 'SUCCESS',
+        'swept_count', swept_count,
+        'total_refunded_inr', total_refund
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Stored RPC: Cloud telemetry & mesh analytics aggregation
+CREATE OR REPLACE FUNCTION rpc_get_mesh_analytics()
+RETURNS json AS $$
+DECLARE
+    result json;
+BEGIN
+    SELECT json_build_object(
+        'total_kwh_delivered', COALESCE(SUM(CASE WHEN status IN ('SETTLED', 'MULE_SYNCED') THEN energy_consumed_kwh ELSE 0 END), 0),
+        'total_gmv_inr', COALESCE(SUM(CASE WHEN status IN ('SETTLED', 'MULE_SYNCED') THEN actual_cost ELSE 0 END), 0),
+        'total_mule_bounties_inr', COALESCE(SUM(mule_reward_inr), 0),
+        'active_nodes_count', (SELECT COUNT(*) FROM nodes WHERE is_active = TRUE),
+        'total_transactions_count', COUNT(*),
+        'settled_transactions_count', COUNT(CASE WHEN status IN ('SETTLED', 'MULE_SYNCED') THEN 1 END)
+    ) INTO result
+    FROM transactions;
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+

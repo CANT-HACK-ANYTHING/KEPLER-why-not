@@ -164,6 +164,18 @@ When passing phones carrying offline receipts reach cellular reception, they upl
 
 ---
 
+### 4. Supabase Cloud Lead & Enterprise Endpoints (Person 2)
+- `GET /api/cloud/supabase/status` - Live Supabase REST connection, PostgREST status, and dual-mode sync state.
+- `POST /api/charge/expire-sweeper` - Automated Escrow Expiry Sweeper releasing 100% of expired unredeemed escrow locks back to drivers.
+- `POST /api/charge/verify-receipt` / `GET /api/charge/audit/{session_id}` - Cryptographic receipt audit and dispute resolution engine (bit-for-bit HMAC verification, PZEM metering integrity, clock skew tolerance, and anti-replay detection).
+- `GET /api/analytics/overview` - Cloud telemetry aggregating network GMV, total kWh delivered, active nodes ratio, and host earnings.
+- `GET /api/analytics/node/{node_id}` - Per-node telemetry and lifetime charging revenue.
+- `POST /api/webhooks/supabase` - Supabase Database Webhook receiver for real-time external state replication.
+- `rpc_sweep_expired_escrows()` & `rpc_get_mesh_analytics()` - Supabase PostgreSQL stored RPC functions.
+
+
+---
+
 ## 🔒 Cryptographic Specifications
 
 ### 1. Hardware Signature Formula

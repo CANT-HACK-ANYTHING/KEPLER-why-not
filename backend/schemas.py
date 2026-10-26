@@ -211,3 +211,81 @@ class HealthCheckResponse(BaseModel):
     active_nodes_count: int
     total_transactions_count: int
     timestamp: str
+
+# ==============================================================================
+# PERSON 2: BACKEND & SUPABASE CLOUD LEAD SCHEMAS
+# ==============================================================================
+
+class EscrowSweeperResponse(BaseModel):
+    swept_count: int
+    total_refunded_inr: float
+    swept_sessions: List[str]
+    message: str
+
+class ReceiptAuditRequest(BaseModel):
+    session_id: str
+    node_id: Optional[str] = None
+    energy_consumed_kwh: Optional[float] = None
+    actual_cost: Optional[float] = None
+    node_signature: Optional[str] = None
+    nonce: Optional[str] = None
+    timestamp: Optional[int] = None
+
+class ReceiptAuditResponse(BaseModel):
+    session_id: str
+    node_id: str
+    is_authentic: bool
+    is_valid_metering: bool
+    is_replay_safe: bool
+    clock_skew_seconds: Optional[int] = None
+    audit_verdict: str  # e.g., "VERIFIED_AUTHENTIC", "TAMPERED_ENERGY_CALCULATION", "INVALID_SIGNATURE", "REPLAY_ATTACK_DETECTED"
+    details: Dict[str, Any]
+
+class MeshAnalyticsOverview(BaseModel):
+    total_kwh_delivered: float
+    total_gmv_inr: float
+    total_host_payouts_inr: float
+    total_mule_bounties_inr: float
+    active_nodes_count: int
+    total_transactions_count: int
+    settled_transactions_count: int
+    expired_transactions_count: int
+    cancelled_transactions_count: int
+    active_escrows_count: int
+    avg_kwh_per_session: float
+    avg_cost_per_session: float
+
+class NodeAnalyticsResponse(BaseModel):
+    node_id: str
+    node_name: str
+    host_name: str
+    location: str
+    rate_per_kwh: float
+    host_wallet_balance: float
+    total_sessions: int
+    settled_sessions: int
+    total_kwh_delivered: float
+    total_revenue_inr: float
+    is_active: bool
+    uptime_status: str
+
+class SupabaseWebhookPayload(BaseModel):
+    type: str = Field(..., description="Event operation: INSERT, UPDATE, or DELETE")
+    table: str = Field(..., description="Target database table")
+    record: Dict[str, Any] = Field(..., description="The record data inserted or updated")
+    old_record: Optional[Dict[str, Any]] = None
+    schema_name: Optional[str] = Field(default="public", alias="schema")
+
+class SupabaseWebhookResponse(BaseModel):
+    status: str
+    action_taken: str
+    record_id: Optional[str] = None
+    message: str
+
+class SupabaseHealthResponse(BaseModel):
+    is_configured: bool
+    supabase_url: Optional[str] = None
+    connection_status: str
+    features: List[str]
+    message: str
+

@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 
 from config import settings
 from database import DatabaseManager, init_database
+from supabase_client import supabase_client
 from security import (
     create_escrow_jwt,
     decode_and_verify_escrow_jwt,
@@ -37,7 +38,15 @@ from schemas import (
     MuleSyncDetail,
     TransactionOut,
     WalletAuditLogOut,
-    HealthCheckResponse
+    HealthCheckResponse,
+    EscrowSweeperResponse,
+    ReceiptAuditRequest,
+    ReceiptAuditResponse,
+    MeshAnalyticsOverview,
+    NodeAnalyticsResponse,
+    SupabaseWebhookPayload,
+    SupabaseWebhookResponse,
+    SupabaseHealthResponse
 )
 
 @asynccontextmanager
@@ -559,3 +568,208 @@ def sync_data_mule_receipts(request: MuleSyncRequest):
 @app.get("/api/transactions", response_model=List[TransactionOut], tags=["Audit & Admin"])
 def list_all_transactions(limit: int = Query(default=100, le=500)):
     return DatabaseManager.get_all_transactions(limit)
+
+# ==============================================================================
+# PERSON 2: BACKEND & SUPABASE CLOUD LEAD ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/cloud/supabase/status", response_model=SupabaseHealthResponse, tags=["Supabase Cloud Lead"])
+def get_supabase_cloud_status():
+    """
+    Returns the live status of the Supabase Cloud REST and PostgREST connection,
+    indicating active features, dual-mode syncing status, and fallback state.
+    """
+    status_info = supabase_client.get_status()
+    return SupabaseHealthResponse(
+        is_configured=status_info["is_configured"],
+        supabase_url=status_info.get("supabase_url"),
+        connection_status=status_info["connection_status"],
+        features=status_info["features"],
+        message=status_info["message"]
+    )
+
+@app.post("/api/charge/expire-sweeper", response_model=EscrowSweeperResponse, tags=["Supabase Cloud Lead"])
+def sweep_expired_charging_escrows():
+    """
+    Automated Escrow Expiry Sweeper
+    Scans for expired sessions in 'ESCROW_LOCKED' state that were never redeemed or settled.
+    Marks them as 'EXPIRED', releases 100% of escrow back to driver wallets, and records
+    immutable double-entry audit ledger entries.
+    """
+    swept_count, total_refunded, swept_sessions = DatabaseManager.sweep_expired_escrows()
+    msg = f"Swept {swept_count} expired escrow sessions. Released ₹{total_refunded:.2f} back to driver wallets."
+    return EscrowSweeperResponse(
+        swept_count=swept_count,
+        total_refunded_inr=total_refunded,
+        swept_sessions=swept_sessions,
+        message=msg
+    )
+
+@app.post("/api/charge/verify-receipt", response_model=ReceiptAuditResponse, tags=["Supabase Cloud Lead"])
+@app.get("/api/charge/audit/{session_id}", response_model=ReceiptAuditResponse, tags=["Supabase Cloud Lead"])
+def audit_charge_receipt(
+    session_id: Optional[str] = None,
+    audit_req: Optional[ReceiptAuditRequest] = None
+):
+    """
+    Cryptographic Receipt Verification & Dispute Resolution Engine
+    Performs comprehensive cryptographic audit of PZEM-004T energy receipts:
+    1. Bit-for-bit HMAC-SHA256 signature verification against node hardware secret.
+    2. Energy consumption vs tariff mathematical consistency check.
+    3. Replay attack and nonce reuse verification.
+    4. Clock skew evaluation within acceptable drift tolerance.
+    """
+    sid = audit_req.session_id if audit_req else session_id
+    if not sid:
+        raise HTTPException(status_code=400, detail="session_id must be provided.")
+
+    tx = DatabaseManager.get_transaction(sid)
+    
+    # Resolve node, energy, cost, signature, and nonce from request or database
+    node_id = (audit_req.node_id if audit_req and audit_req.node_id else None) or (tx["node_id"] if tx else "RelayEV-Node-01")
+    energy_kwh = (audit_req.energy_consumed_kwh if audit_req and audit_req.energy_consumed_kwh is not None else None) or (tx["energy_consumed_kwh"] if tx else 0.0)
+    cost = (audit_req.actual_cost if audit_req and audit_req.actual_cost is not None else None) or (tx["actual_cost"] if tx else 0.0)
+    signature = (audit_req.node_signature if audit_req and audit_req.node_signature else None) or (tx["node_signature"] if tx and tx.get("node_signature") else "")
+    nonce = (audit_req.nonce if audit_req and audit_req.nonce else None) or (tx["nonce"] if tx and tx.get("nonce") else None)
+    ts = (audit_req.timestamp if audit_req and audit_req.timestamp else None)
+
+    node = DatabaseManager.get_node(node_id)
+    secret_key = node["hardware_secret"] if node else settings.NODE_SIGNATURE_KEY
+    rate_per_kwh = node["rate_per_kwh"] if node else 10.0
+
+    # 1. Signature check
+    is_valid_sig, is_auth = verify_node_receipt_signature(
+        session_id=sid,
+        energy_kwh=energy_kwh,
+        cost=cost,
+        signature=signature,
+        secret_key=secret_key
+    )
+
+    # 2. Metering integrity check
+    is_valid_metering = verify_metering_integrity(energy_kwh, rate_per_kwh, cost)
+
+    # 3. Nonce check
+    conn = DatabaseManager.get_connection()
+    nonce_row = conn.execute("SELECT * FROM nonces WHERE nonce = ?", (nonce,)).fetchone() if nonce else None
+    conn.close()
+    is_replay_safe = (nonce_row is None) or (nonce_row["session_id"] == sid)
+
+    # 4. Clock skew check
+    clock_skew = None
+    is_clock_ok = True
+    if ts:
+        clock_skew = int(abs(time.time() - ts))
+        if clock_skew > settings.MAX_CLOCK_SKEW_SECONDS:
+            is_clock_ok = False
+
+    # Determine Verdict
+    if not is_valid_sig:
+        verdict = "INVALID_HARDWARE_SIGNATURE"
+    elif not is_valid_metering:
+        verdict = "TAMPERED_ENERGY_CALCULATION"
+    elif not is_replay_safe:
+        verdict = "REPLAY_ATTACK_DETECTED"
+    elif not is_clock_ok:
+        verdict = "EXCESSIVE_CLOCK_SKEW"
+    else:
+        verdict = "VERIFIED_AUTHENTIC"
+
+    return ReceiptAuditResponse(
+        session_id=sid,
+        node_id=node_id,
+        is_authentic=is_valid_sig,
+        is_valid_metering=is_valid_metering,
+        is_replay_safe=is_replay_safe,
+        clock_skew_seconds=clock_skew,
+        audit_verdict=verdict,
+        details={
+            "rate_per_kwh": rate_per_kwh,
+            "calculated_expected_cost": round(energy_kwh * rate_per_kwh, 2),
+            "reported_actual_cost": cost,
+            "signature_provided": signature[:16] + "..." if signature else "NONE",
+            "transaction_status": tx["status"] if tx else "UNKNOWN_OR_UNRECORDED"
+        }
+    )
+
+@app.get("/api/analytics/overview", response_model=MeshAnalyticsOverview, tags=["Supabase Cloud Lead"])
+def get_mesh_analytics_overview():
+    """
+    Cloud Telemetry & Business Analytics
+    Aggregates mesh-wide Gross Merchandise Value (GMV), total kWh delivered,
+    active nodes ratio, host earnings, and mule micro-incentive bounties.
+    """
+    stats = DatabaseManager.get_mesh_analytics()
+    return MeshAnalyticsOverview(**stats)
+
+@app.get("/api/analytics/node/{node_id}", response_model=NodeAnalyticsResponse, tags=["Supabase Cloud Lead"])
+def get_single_node_analytics(node_id: str):
+    """
+    Per-Node Telemetry & Revenue Breakdown
+    Provides historical session count, total kWh dispensed, and host balance for a specific station.
+    """
+    node_stats = DatabaseManager.get_node_analytics(node_id)
+    if not node_stats:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found.")
+    return NodeAnalyticsResponse(**node_stats)
+
+@app.post("/api/webhooks/supabase", response_model=SupabaseWebhookResponse, tags=["Supabase Cloud Lead"])
+def handle_supabase_database_webhook(payload: SupabaseWebhookPayload):
+    """
+    Supabase Database Webhook Receiver
+    Processes asynchronous event notifications from Supabase PostgreSQL (e.g. external top-ups,
+    admin node additions, or payment gateway webhooks) and maintains local state integrity.
+    """
+    event_type = payload.type.upper()
+    table = payload.table.lower()
+    rec = payload.record
+
+    action_msg = f"Processed {event_type} on {table}"
+    record_id = rec.get("id") or rec.get("session_id") or rec.get("user_id")
+
+    if table == "users" and event_type in ["INSERT", "UPDATE"]:
+        if "wallet_balance" in rec and "id" in rec:
+            user = DatabaseManager.get_user(rec["id"])
+            if user:
+                DatabaseManager.update_user_balance(
+                    user_id=rec["id"],
+                    new_balance=float(rec["wallet_balance"]),
+                    change_type="SUPABASE_WEBHOOK_SYNC",
+                    reference_id="WEBHOOK"
+                )
+                action_msg = f"Synchronized user {rec['id']} wallet balance to ₹{float(rec['wallet_balance']):.2f}"
+            else:
+                DatabaseManager.create_user(
+                    user_id=rec["id"],
+                    name=rec.get("name", "Supabase Synced User"),
+                    phone=rec.get("phone", "+91-9000000000"),
+                    role=rec.get("role", "driver"),
+                    initial_balance=float(rec.get("wallet_balance", 500.0))
+                )
+                action_msg = f"Created new user {rec['id']} from Supabase webhook"
+
+    elif table == "nodes" and event_type == "INSERT":
+        if "id" in rec and "name" in rec:
+            existing = DatabaseManager.get_node(rec["id"])
+            if not existing or existing["id"] != rec["id"]:
+                DatabaseManager.register_node(
+                    node_id=rec["id"],
+                    name=rec.get("name", "New Node"),
+                    host_name=rec.get("host_name", "Host"),
+                    location=rec.get("location", "Rural Hub"),
+                    rate_per_kwh=float(rec.get("rate_per_kwh") or rec.get("tariff_per_kwh") or 10.0),
+                    max_power_kw=float(rec.get("max_power_kw", 3.3)),
+                    latitude=float(rec.get("latitude", 28.6140)),
+                    longitude=float(rec.get("longitude", 77.2090)),
+                    hardware_secret=rec.get("hardware_secret", settings.NODE_SIGNATURE_KEY),
+                    host_user_id=rec.get("host_user_id")
+                )
+                action_msg = f"Registered new node {rec['id']} from Supabase webhook"
+
+    return SupabaseWebhookResponse(
+        status="SUCCESS",
+        action_taken=action_msg,
+        record_id=str(record_id) if record_id else None,
+        message="Supabase webhook event consumed and state synchronized."
+    )
+

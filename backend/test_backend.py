@@ -346,3 +346,136 @@ def test_wallet_audit_ledger():
     assert len(entries) > 0
     change_types = [e["change_type"] for e in entries]
     assert any("ESCROW" in ct or "BALANCE" in ct or "TOPUP" in ct for ct in change_types)
+
+# ==============================================================================
+# 7. PERSON 2: BACKEND & SUPABASE CLOUD LEAD TESTS
+# ==============================================================================
+
+def test_supabase_cloud_status():
+    res = client.get("/api/cloud/supabase/status")
+    assert res.status_code == 200
+    data = res.json()
+    assert "connection_status" in data
+    assert "features" in data
+    assert len(data["features"]) > 0
+
+def test_escrow_expiry_sweeper():
+    # 0. Clean any pre-existing dangling test escrows and reset balance to 500.00
+    client.post("/api/charge/expire-sweeper")
+    client.post("/api/user/reset_balance", json={"user_id": "user_88", "amount": 500.00})
+
+    # 1. Lock ₹100.00 in escrow
+    start_res = client.post("/api/charge/start", json={
+        "user_id": "user_88",
+        "node_id": "RelayEV-Node-01",
+        "escrow_amount": 100.00
+    })
+    assert start_res.status_code == 200
+    s_data = start_res.json()
+    sid = s_data["session_id"]
+    assert s_data["user_remaining_balance"] == 400.00
+
+    # 2. Backdate the expiration time to simulate an unredeemed expired escrow
+    conn = DatabaseManager.get_connection()
+    conn.execute("UPDATE transactions SET expires_at = '2020-01-01T00:00:00' WHERE session_id = ?", (sid,))
+    conn.commit()
+    conn.close()
+
+    # 3. Trigger cloud escrow sweeper
+    sweep_res = client.post("/api/charge/expire-sweeper")
+    assert sweep_res.status_code == 200
+    sw_data = sweep_res.json()
+    assert sw_data["swept_count"] >= 1
+    assert sid in sw_data["swept_sessions"]
+    assert sw_data["total_refunded_inr"] >= 100.00
+
+    # 4. Verify user wallet restored 100% to ₹500.00
+    user_res = client.get("/api/user/me?user_id=user_88")
+    assert user_res.json()["wallet_balance"] == 500.00
+
+    # 5. Verify transaction status is EXPIRED
+    tx = client.get(f"/api/charge/session/{sid}").json()
+    assert tx["status"] == "EXPIRED"
+
+def test_receipt_audit_engine():
+    sid = f"REV-AUDIT-{uuid.uuid4().hex[:8].upper()}"
+    secret = settings.NODE_SIGNATURE_KEY
+    energy = 5.0
+    cost = 50.0  # 5.0 kWh * 10.0 INR/kWh
+    canonical = f"{sid}:{energy:.3f}:{cost:.2f}"
+    valid_sig = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
+
+    # Case A: Valid authentic receipt
+    audit_res = client.post("/api/charge/verify-receipt", json={
+        "session_id": sid,
+        "node_id": "RelayEV-Node-01",
+        "energy_consumed_kwh": energy,
+        "actual_cost": cost,
+        "node_signature": valid_sig,
+        "nonce": f"nonce_{uuid.uuid4().hex[:8]}",
+        "timestamp": int(time.time())
+    })
+    assert audit_res.status_code == 200
+    adata = audit_res.json()
+    assert adata["is_authentic"] is True
+    assert adata["is_valid_metering"] is True
+    assert adata["audit_verdict"] == "VERIFIED_AUTHENTIC"
+
+    # Case B: Tampered energy metering calculation (10 kWh for 50 INR with 10 INR tariff)
+    tampered_sig = hmac.new(secret.encode(), f"{sid}:10.000:50.00".encode(), hashlib.sha256).hexdigest()
+    tampered_res = client.post("/api/charge/verify-receipt", json={
+        "session_id": sid,
+        "node_id": "RelayEV-Node-01",
+        "energy_consumed_kwh": 10.0,
+        "actual_cost": 50.0,
+        "node_signature": tampered_sig,
+        "nonce": f"nonce_{uuid.uuid4().hex[:8]}",
+        "timestamp": int(time.time())
+    })
+    assert tampered_res.status_code == 200
+    tdata = tampered_res.json()
+    assert tdata["is_valid_metering"] is False
+    assert tdata["audit_verdict"] == "TAMPERED_ENERGY_CALCULATION"
+
+def test_mesh_analytics_overview_and_node():
+    # 1. Overview analytics
+    res = client.get("/api/analytics/overview")
+    assert res.status_code == 200
+    overview = res.json()
+    assert "total_kwh_delivered" in overview
+    assert "total_gmv_inr" in overview
+    assert overview["active_nodes_count"] >= 4
+    assert overview["total_transactions_count"] >= 1
+
+    # 2. Node specific analytics
+    node_res = client.get("/api/analytics/node/RelayEV-Node-01")
+    assert node_res.status_code == 200
+    node_data = node_res.json()
+    assert node_data["node_id"] == "RelayEV-Node-01"
+    assert node_data["uptime_status"] == "ONLINE_HEALTHY"
+    assert "total_kwh_delivered" in node_data
+
+def test_supabase_database_webhook():
+    # Simulate an external wallet balance update from Supabase DB webhook
+    webhook_payload = {
+        "type": "UPDATE",
+        "table": "users",
+        "record": {
+            "id": "user_88",
+            "name": "Anaya Rao (EV Driver)",
+            "wallet_balance": 888.00
+        }
+    }
+    res = client.post("/api/webhooks/supabase", json=webhook_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "SUCCESS"
+    assert "888.00" in data["action_taken"]
+
+    # Verify user balance updated
+    user = client.get("/api/user/me?user_id=user_88").json()
+    assert user["wallet_balance"] == 888.00
+
+    # Reset balance back to 500
+    client.post("/api/user/reset_balance", json={"user_id": "user_88", "amount": 500.00})
+

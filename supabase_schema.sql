@@ -106,3 +106,107 @@ VALUES
 ON CONFLICT (id) DO UPDATE SET
     status = EXCLUDED.status,
     tariff_per_kwh = EXCLUDED.tariff_per_kwh;
+
+
+-- ============================================================================
+-- 5. USERS, TRANSACTIONS, NONCES & AUDIT TABLES (Backend & Supabase Lead)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'driver',
+    wallet_balance NUMERIC(10, 2) NOT NULL DEFAULT 500.00,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.transactions (
+    id TEXT PRIMARY KEY,
+    session_id TEXT UNIQUE NOT NULL,
+    user_id TEXT NOT NULL REFERENCES public.users(id),
+    node_id TEXT NOT NULL REFERENCES public.nodes(id),
+    escrow_amount NUMERIC(10, 2) NOT NULL,
+    rate_per_kwh NUMERIC(10, 2) NOT NULL,
+    max_energy_kwh NUMERIC(10, 3) NOT NULL,
+    energy_consumed_kwh NUMERIC(10, 3) DEFAULT 0.000,
+    actual_cost NUMERIC(10, 2) DEFAULT 0.00,
+    refund_amount NUMERIC(10, 2) DEFAULT 0.00,
+    status TEXT NOT NULL DEFAULT 'ESCROW_LOCKED',
+    escrow_token TEXT NOT NULL,
+    signed_receipt TEXT NULL,
+    receipt_hash TEXT NULL,
+    node_signature TEXT NULL,
+    nonce TEXT NULL,
+    mule_user_id TEXT NULL REFERENCES public.users(id),
+    mule_reward_inr NUMERIC(10, 2) DEFAULT 0.00,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    settled_at TIMESTAMPTZ NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.nonces (
+    nonce TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.wallet_audit_logs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES public.users(id),
+    change_type TEXT NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL,
+    balance_after NUMERIC(10, 2) NOT NULL,
+    reference_id TEXT NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Enable RLS & Realtime
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wallet_audit_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read users" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Allow public read transactions" ON public.transactions FOR SELECT USING (true);
+CREATE POLICY "Allow public read audit logs" ON public.wallet_audit_logs FOR SELECT USING (true);
+
+-- ============================================================================
+-- 6. RPC STORED FUNCTIONS
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION rpc_sweep_expired_escrows()
+RETURNS json AS $$
+DECLARE
+    swept_count INT := 0;
+    total_refund NUMERIC(10, 2) := 0.00;
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT session_id, user_id, escrow_amount 
+        FROM public.transactions 
+        WHERE status = 'ESCROW_LOCKED' AND expires_at < NOW()
+    LOOP
+        UPDATE public.transactions 
+        SET status = 'EXPIRED', refund_amount = r.escrow_amount, settled_at = NOW()
+        WHERE session_id = r.session_id;
+
+        UPDATE public.users
+        SET wallet_balance = wallet_balance + r.escrow_amount, updated_at = NOW()
+        WHERE id = r.user_id;
+
+        INSERT INTO public.wallet_audit_logs (id, user_id, change_type, amount, balance_after, reference_id, timestamp)
+        SELECT 'LOG-SWEEP-' || SUBSTR(MD5(RANDOM()::TEXT), 1, 8), r.user_id, 'ESCROW_EXPIRED_REFUND', r.escrow_amount, wallet_balance, r.session_id, NOW()
+        FROM public.users WHERE id = r.user_id;
+
+        swept_count := swept_count + 1;
+        total_refund := total_refund + r.escrow_amount;
+    END LOOP;
+
+    RETURN json_build_object(
+        'status', 'SUCCESS',
+        'swept_count', swept_count,
+        'total_refunded_inr', total_refund
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
