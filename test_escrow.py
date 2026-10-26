@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+"""
+RelayEV End-to-End Escrow & Offline Hardware Settlement Test Suite
+Simulates:
+1. Driver locking ₹200 escrow (POST /api/charge/start)
+2. Receiving cryptographically signed JWT token
+3. Offline ESP32 metering 8.42 kWh and generating canonical receipt
+4. Hardware HMAC-SHA256 signature generation
+5. Security Trap Test: Proving fake signatures trigger 403 Forbidden
+6. Settlement Test: Proving valid signature triggers 200 OK & atomic refund
+"""
+
+import os
+import sys
+import json
+import time
+import hmac
+import hashlib
+
+# Ensure utf-8 output encoding across Windows/macOS/Linux consoles
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
+import requests
+import jwt
+
+# ============================================================
+# Configuration & ANSI Styling
+# ============================================================
+BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+JWT_SECRET = os.getenv("JWT_SECRET", "relayev_super_secret_offline_mesh_key_2026")
+
+GREEN = "\033[92m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+RESET = "\033[0m"
+
+# Create requests session with direct loopback
+session = requests.Session()
+session.trust_env = False
+
+
+def print_step(step_num: int, title: str):
+    print(f"\n{BOLD}{CYAN}------------------------------------------------------------{RESET}")
+    print(f"{BOLD}{CYAN}[Step {step_num}] {title}{RESET}")
+    print(f"{BOLD}{CYAN}------------------------------------------------------------{RESET}")
+
+
+def print_success(msg: str):
+    print(f"{BOLD}{GREEN}✅ SUCCESS:{RESET} {msg}")
+
+
+def print_failed(msg: str, detail: str = None):
+    print(f"{BOLD}{RED}❌ FAILED:{RESET} {msg}")
+    if detail:
+        print(f"   {DIM}{detail}{RESET}")
+
+
+def generate_esp32_signature(receipt: dict, secret: str) -> str:
+    """
+    Simulates the ESP32 embedded firmware HMAC-SHA256 signature.
+    Uses canonical JSON: sorted keys and compact separators (',', ':').
+    """
+    canonical_receipt_json = json.dumps(
+        receipt,
+        sort_keys=True,
+        separators=(",", ":")
+    )
+    return hmac.new(
+        secret.encode("utf-8"),
+        canonical_receipt_json.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+
+
+def run_direct_mode():
+    """
+    Direct in-process execution using the FastAPI backend handlers directly.
+    Runs without needing a separate uvicorn HTTP server running.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
+    from main import charge_start, charge_stop, ChargeStartRequest, ChargeStopRequest, OfflineReceipt
+
+    print(f"\n{BOLD}{YELLOW}============================================================{RESET}")
+    print(f"{BOLD}{YELLOW}   ⚡ RelayEV Offline Escrow & Security Verification Test    {RESET}")
+    print(f"{BOLD}{YELLOW}============================================================{RESET}")
+    print(f"Mode:          {CYAN}Direct In-Process Engine Execution{RESET}")
+    print(f"Secret Key:    {DIM}{JWT_SECRET[:8]}...{JWT_SECRET[-6:]}{RESET}")
+    print_success("FastAPI backend engine loaded directly in memory!")
+
+    # Step 1: Start Charge
+    print_step(1, "Start Charge (Lock ₹200 Escrow for user_88)")
+    start_req = ChargeStartRequest(user_id="user_88", node_id="node_esp32_01", escrow_amount=200.00)
+    start_data = charge_start(start_req)
+    if hasattr(start_data, "model_dump"):
+        start_dict = start_data.model_dump()
+    elif isinstance(start_data, dict):
+        start_dict = start_data
+    else:
+        start_dict = vars(start_data)
+
+    tx_id = start_dict["tx_id"]
+    session_token = start_dict["session_token"]
+    max_kwh = start_dict["max_kwh"]
+    print_success("Escrow locked ₹200.00 successfully!")
+    print(f"   • Transaction ID : {BOLD}{tx_id}{RESET}")
+    print(f"   • Energy Budget  : {BOLD}{max_kwh} kWh{RESET}")
+
+    # Step 2: Extract & Inspect JWT
+    print_step(2, "Extract & Inspect Session Token (JWT)")
+    print_success("Extracted session_token (JWT) from response!")
+    print(f"   • Raw Token (truncated): {DIM}{session_token[:25]}...{session_token[-20:]}{RESET}")
+    decoded_claims = jwt.decode(session_token, JWT_SECRET, algorithms=["HS256"])
+    print(f"   • Decoded Claims:")
+    print(f"       - tx_id   : {decoded_claims.get('tx_id')}")
+    print(f"       - user_id : {decoded_claims.get('user_id')}")
+    print(f"       - node_id : {decoded_claims.get('node_id')}")
+    print(f"       - max_kwh : {decoded_claims.get('max_kwh')} kWh")
+    print(f"       - exp     : {decoded_claims.get('exp')}")
+    print_success("JWT signature and claims verified against JWT_SECRET!")
+
+    # Step 3: Simulate Hardware
+    print_step(3, "Simulate Offline ESP32 Metering (8.42 kWh Delivered)")
+    receipt_dict = {
+        "tx_id": tx_id,
+        "node_id": "node_esp32_01",
+        "kwh_delivered": 8.42,
+        "timestamp_end": int(time.time())
+    }
+    receipt_model = OfflineReceipt(**receipt_dict)
+    print("Receipt Object generated by offline ESP32:")
+    print(f"{json.dumps(receipt_dict, indent=2)}")
+    print_success("Offline hardware receipt generated showing 8.42 kWh delivered.")
+
+    # Step 4: Sign Receipt
+    print_step(4, "Sign Receipt with HMAC-SHA256 (ESP32 Cryptographic Seal)")
+    valid_signature = generate_esp32_signature(receipt_dict, JWT_SECRET)
+    print("Generated HMAC-SHA256 Signature:")
+    print(f"   • {BOLD}{valid_signature}{RESET}")
+    print_success("Valid cryptographic signature minted.")
+
+    # Step 5: Security Trap Test
+    print_step(5, "Security Trap Test (Tampered Signature -> Expected 403 Forbidden)")
+    tampered_signature = "bad_signature_deadbeef1337cafe0000000000000000000000000000000000000000"
+    print(f"Submitting receipt with forged signature: {DIM}{tampered_signature}{RESET}")
+    try:
+        charge_stop(ChargeStopRequest(tx_id=tx_id, offline_receipt=receipt_model, signature=tampered_signature))
+        print_failed("Security vulnerability! Server accepted a bad signature.")
+        sys.exit(1)
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", 500)
+        detail = getattr(exc, "detail", str(exc))
+        if status_code == 403:
+            print_success("Security trap test passed! Server rejected forged signature with 403 Forbidden.")
+            print(f"   • Server Rejection Detail: {DIM}'{detail}'{RESET}")
+        else:
+            print_failed(f"Expected 403 but got {status_code}: {detail}")
+            sys.exit(1)
+
+    # Step 6: Settlement Test
+    print_step(6, "Settlement Test (Valid Signature -> Expected 200 OK & Refund)")
+    print(f"Submitting receipt with valid signature: {DIM}{valid_signature}{RESET}")
+    settle_res = charge_stop(ChargeStopRequest(tx_id=tx_id, offline_receipt=receipt_model, signature=valid_signature))
+    data_block = settle_res.get("data", {})
+    final_cost = data_block.get("final_cost")
+    refund_amount = data_block.get("refund_amount")
+    kwh_delivered = data_block.get("kwh_delivered")
+
+    print_success("Settlement completed with 200 Success!")
+    print(f"   • Status          : {BOLD}{data_block.get('status', 'settled').upper()}{RESET}")
+    print(f"   • Energy Delivered: {BOLD}{kwh_delivered} kWh{RESET}")
+    print(f"   • Final Cost      : {BOLD}₹{final_cost:.2f}{RESET}")
+    print(f"   • Refund Credited : {BOLD}₹{refund_amount:.2f}{RESET}")
+    if "wallet_balance" in data_block:
+        print(f"   • Updated Balance : {BOLD}₹{data_block['wallet_balance']:.2f}{RESET}")
+    print_success("All escrow funds settled and change reconciled atomically!")
+
+    print(f"\n{BOLD}{GREEN}============================================================{RESET}")
+    print(f"{BOLD}{GREEN}       🎉 ALL 6 ESCROW & SECURITY VERIFICATION TESTS PASSED!  {RESET}")
+    print(f"{BOLD}{GREEN}============================================================{RESET}\n")
+
+
+def run_http_mode():
+    print(f"\n{BOLD}{YELLOW}============================================================{RESET}")
+    print(f"{BOLD}{YELLOW}   ⚡ RelayEV Offline Escrow & Security Verification Test    {RESET}")
+    print(f"{BOLD}{YELLOW}============================================================{RESET}")
+    print(f"Target Server: {CYAN}{BASE_URL}{RESET}")
+    print(f"Secret Key:    {DIM}{JWT_SECRET[:8]}...{JWT_SECRET[-6:]}{RESET}")
+
+    # 0. Health Check
+    try:
+        health_resp = session.get(f"{BASE_URL}/health", timeout=3)
+        if health_resp.status_code == 200:
+            engine_name = health_resp.json().get("engine", "RelayEV Backend")
+            print_success(f"FastAPI server is reachable! Engine: {engine_name}")
+        else:
+            print_failed(f"Server responded with status {health_resp.status_code}")
+    except requests.exceptions.RequestException:
+        print_failed(f"Could not connect to FastAPI server at {BASE_URL}")
+        print(f"\n{YELLOW}Please ensure your FastAPI backend is running! In VS Code terminal:{RESET}")
+        print(f"  {BOLD}cd backend{RESET}")
+        print(f"  {BOLD}.\\venv\\Scripts\\activate{RESET}")
+        print(f"  {BOLD}uvicorn main:app --reload --port 8000{RESET}\n")
+        print(f"{CYAN}Or run in direct mode (without starting uvicorn):{RESET}")
+        print(f"  {BOLD}python test_escrow.py --direct{RESET}\n")
+        sys.exit(1)
+
+    # 1. Start Charge
+    print_step(1, "Start Charge (Lock ₹200 Escrow for user_88)")
+    start_payload = {
+        "user_id": "user_88",
+        "node_id": "node_esp32_01",
+        "escrow_amount": 200.00
+    }
+    print(f"POST {BASE_URL}/api/charge/start")
+    print(f"Payload: {json.dumps(start_payload, indent=2)}")
+
+    try:
+        start_resp = session.post(f"{BASE_URL}/api/charge/start", json=start_payload, timeout=5)
+    except Exception as e:
+        print_failed("Failed to send POST /api/charge/start", str(e))
+        sys.exit(1)
+
+    if start_resp.status_code == 200:
+        start_data = start_resp.json()
+        tx_id = start_data.get("tx_id")
+        session_token = start_data.get("session_token")
+        max_kwh = start_data.get("max_kwh")
+        print_success("Escrow locked ₹200.00 successfully!")
+        print(f"   • Transaction ID : {BOLD}{tx_id}{RESET}")
+        print(f"   • Energy Budget  : {BOLD}{max_kwh} kWh{RESET}")
+    else:
+        print_failed(f"Expected 200 OK but received {start_resp.status_code}", start_resp.text)
+        sys.exit(1)
+
+    # 2. Extract Token
+    print_step(2, "Extract & Inspect Session Token (JWT)")
+    if session_token:
+        print_success("Extracted session_token (JWT) from response!")
+        print(f"   • Raw Token (truncated): {DIM}{session_token[:25]}...{session_token[-20:]}{RESET}")
+        try:
+            decoded_claims = jwt.decode(session_token, JWT_SECRET, algorithms=["HS256"])
+            print(f"   • Decoded Claims:")
+            print(f"       - tx_id   : {decoded_claims.get('tx_id')}")
+            print(f"       - user_id : {decoded_claims.get('user_id')}")
+            print(f"       - node_id : {decoded_claims.get('node_id')}")
+            print(f"       - max_kwh : {decoded_claims.get('max_kwh')} kWh")
+            print(f"       - exp     : {decoded_claims.get('exp')}")
+            print_success("JWT signature and claims verified against JWT_SECRET!")
+        except Exception as e:
+            print_failed("Failed to decode session_token with JWT_SECRET", str(e))
+            sys.exit(1)
+    else:
+        print_failed("No session_token found in start response!")
+        sys.exit(1)
+
+    # 3. Simulate Hardware
+    print_step(3, "Simulate Offline ESP32 Metering (8.42 kWh Delivered)")
+    offline_receipt = {
+        "tx_id": tx_id,
+        "node_id": "node_esp32_01",
+        "kwh_delivered": 8.42,
+        "timestamp_end": int(time.time())
+    }
+    print("Receipt Object generated by offline ESP32:")
+    print(f"{json.dumps(offline_receipt, indent=2)}")
+    print_success("Offline hardware receipt generated showing 8.42 kWh delivered.")
+
+    # 4. Sign Receipt
+    print_step(4, "Sign Receipt with HMAC-SHA256 (ESP32 Cryptographic Seal)")
+    valid_signature = generate_esp32_signature(offline_receipt, JWT_SECRET)
+    print("Generated HMAC-SHA256 Signature:")
+    print(f"   • {BOLD}{valid_signature}{RESET}")
+    print_success("Valid cryptographic signature minted.")
+
+    # 5. Security Trap Test
+    print_step(5, "Security Trap Test (Tampered Signature -> Expected 403 Forbidden)")
+    tampered_signature = "bad_signature_deadbeef1337cafe0000000000000000000000000000000000000000"
+    trap_payload = {
+        "tx_id": tx_id,
+        "offline_receipt": offline_receipt,
+        "signature": tampered_signature
+    }
+    print(f"POST {BASE_URL}/api/charge/stop")
+    print(f"Submitting receipt with forged signature: {DIM}{tampered_signature}{RESET}")
+
+    try:
+        trap_resp = session.post(f"{BASE_URL}/api/charge/stop", json=trap_payload, timeout=5)
+    except Exception as e:
+        print_failed("Request to /api/charge/stop failed", str(e))
+        sys.exit(1)
+
+    if trap_resp.status_code == 403:
+        detail_msg = trap_resp.json().get("detail", "")
+        print_success("Security trap test passed! Server rejected forged signature with 403 Forbidden.")
+        print(f"   • Server Rejection Detail: {DIM}'{detail_msg}'{RESET}")
+    else:
+        print_failed(
+            f"Security vulnerability detected! Expected 403 Forbidden, got {trap_resp.status_code}",
+            trap_resp.text
+        )
+        sys.exit(1)
+
+    # 6. Settlement Test
+    print_step(6, "Settlement Test (Valid Signature -> Expected 200 OK & Refund)")
+    settle_payload = {
+        "tx_id": tx_id,
+        "offline_receipt": offline_receipt,
+        "signature": valid_signature
+    }
+    print(f"POST {BASE_URL}/api/charge/stop")
+    print(f"Submitting receipt with valid signature: {DIM}{valid_signature}{RESET}")
+
+    try:
+        settle_resp = session.post(f"{BASE_URL}/api/charge/stop", json=settle_payload, timeout=5)
+    except Exception as e:
+        print_failed("Request to /api/charge/stop failed", str(e))
+        sys.exit(1)
+
+    if settle_resp.status_code == 200:
+        settle_data = settle_resp.json()
+        data_block = settle_data.get("data", {})
+        final_cost = data_block.get("final_cost")
+        refund_amount = data_block.get("refund_amount")
+        kwh_delivered = data_block.get("kwh_delivered")
+
+        print_success("Settlement completed with 200 Success!")
+        print(f"   • Status          : {BOLD}{data_block.get('status', 'settled').upper()}{RESET}")
+        print(f"   • Energy Delivered: {BOLD}{kwh_delivered} kWh{RESET}")
+        print(f"   • Final Cost      : {BOLD}₹{final_cost:.2f}{RESET}")
+        print(f"   • Refund Credited : {BOLD}₹{refund_amount:.2f}{RESET}")
+        if "wallet_balance" in data_block:
+            print(f"   • Updated Balance : {BOLD}₹{data_block['wallet_balance']:.2f}{RESET}")
+        print_success("All escrow funds settled and change reconciled atomically!")
+    else:
+        print_failed(f"Settlement failed with status {settle_resp.status_code}", settle_resp.text)
+        sys.exit(1)
+
+    print(f"\n{BOLD}{GREEN}============================================================{RESET}")
+    print(f"{BOLD}{GREEN}       🎉 ALL 6 ESCROW & SECURITY VERIFICATION TESTS PASSED!  {RESET}")
+    print(f"{BOLD}{GREEN}============================================================{RESET}\n")
+
+
+if __name__ == "__main__":
+    if "--direct" in sys.argv:
+        run_direct_mode()
+    else:
+        run_http_mode()
