@@ -12,7 +12,7 @@
 3. **The RelayEV Breakthrough**:
    - **Zero-OPEX Hardware**: Operates without host Wi-Fi or cellular modems.
    - **Cryptographic Offline Escrow**: Uses backend-signed JWT vouchers pushed over Web Bluetooth to close the 30A relay locally.
-   - **Drive-By Data Mules**: Stranded offline receipts stored on ESP32 flash memory are uploaded by passing smartphones, creating a self-healing mesh with micro-incentives.
+   - **Drive-By Data Mules**: Stranded offline receipts stored on ESP32 flash memory are uploaded by passing smartphones, creating a self-healing mesh with micro-incentives (₹2.00 INR per voucher).
 
 ---
 
@@ -54,7 +54,7 @@ RelayEV/
 │   ├── schema.sql                 # Supabase PostgreSQL schema with RLS
 │   ├── requirements.txt           # Python dependencies
 │   ├── test_backend.py            # 14 Pytest automated tests
-│   └── README.md                  # In-depth backend technical documentation
+│   └── Dockerfile                 # Python 3.12-slim production container
 ├── firmware/                      # ESP32 & ESP32-S3 Physical Hardware Firmware
 │   ├── esp32_relay_node/
 │   │   ├── esp32_relay_node.ino   # Master sketch (Setup, loop, serial CLI)
@@ -67,22 +67,41 @@ RelayEV/
 │   │   ├── platformio.ini         # PlatformIO build configuration
 │   │   └── README.md              # BOM, schematics, and flashing guide
 │   └── test_firmware_crypto.py    # Automated firmware & cloud verification suite
-├── frontend/                      # Next.js 16 App Router UI
+├── frontend/                      # Next.js 16 App Router UI (PWA & Standalone)
+│   ├── public/
+│   │   ├── manifest.json          # Web App Manifest
+│   │   ├── sw.js                  # PWA offline service worker
+│   │   └── icons/                 # PWA icons (192x192, 512x512)
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── page.tsx           # Community map & sliding Station Drawer
-│   │   │   └── charge/            # Dedicated /charge direct testing route
+│   │   │   ├── charge/page.tsx    # Direct /charge WebBLE & Simulator testing
+│   │   │   ├── host/page.tsx      # Host Node Dashboard & Instant UPI Payouts
+│   │   │   ├── mule/page.tsx      # Drive-By Data Mule Portal & Micro-Bounties
+│   │   │   └── manifest.ts        # Dynamic Next.js metadata manifest
 │   │   ├── components/
-│   │   │   ├── BleConnector.tsx   # Real Web Bluetooth (WebBLE)
+│   │   │   ├── Navigation.tsx     # Global responsive top navigation bar
+│   │   │   ├── PwaBanner.tsx      # Offline mesh mode badge & 1-tap install
+│   │   │   ├── OfflineMeshContext.tsx # Network online/offline event dispatcher
+│   │   │   ├── BleConnector.tsx   # Native Web Bluetooth (WebBLE)
 │   │   │   ├── BleSimulator.tsx   # Mock ESP32 Hardware Simulator
 │   │   │   └── ChargingSessionManager.tsx # Escrow & settlement orchestrator
-│   │   ├── lib/
-│   │   │   ├── bleService.ts      # Web Bluetooth GATT service driver
-│   │   │   ├── crypto.ts          # Browser Web Crypto HMAC-SHA256 generator
-│   │   │   └── supabaseClient.ts  # Supabase client initialization
-│   │   └── types/ble.ts           # GATT UUIDs and telemetry interfaces
+│   │   └── lib/
+│   │       ├── offlineMeshStorage.ts # Offline receipt queue in dead zones
+│   │       ├── bleService.ts      # Web Bluetooth GATT service driver
+│   │       └── crypto.ts          # Browser Web Crypto HMAC-SHA256 generator
+│   ├── Dockerfile                 # Multi-stage Next.js standalone container
 │   └── package.json
+├── nginx/
+│   └── nginx.conf                 # Edge reverse proxy configuration
+├── scripts/
+│   ├── migrate_supabase.py        # Cloud PostgreSQL migration engine
+│   ├── test_pwa_offline_mesh.py   # PWA & offline sync verification
+│   └── test_host_and_mule_portal.py # Host payouts & Data Mule verification
+├── docker-compose.yml             # Single-command production stack
+├── docker-compose.dev.yml         # Development stack with hot-reloading
 ├── test_lifecycle.py              # End-to-end integration test suite
+├── DEPLOYMENT.md                  # Comprehensive Cloud & VPS deployment guide
 └── README.md                      # Project Overview
 ```
 
@@ -90,29 +109,33 @@ RelayEV/
 
 ## 🚀 Quickstart
 
-### 1. Backend Setup & Test Suite
+### 1. Full-Stack Single-Command Deployment (Docker)
+```bash
+docker compose up -d --build
+```
+- Web Application: **[http://localhost](http://localhost)**
+- Interactive API Docs: **[http://localhost/docs](http://localhost/docs)**
+
+### 2. Manual Development Setup
+
+#### Backend (FastAPI):
 ```powershell
 cd backend
 python -m pip install -r requirements.txt
 python -m pytest test_backend.py -v
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
-Interactive Swagger API docs: **[http://localhost:8000/docs](http://localhost:8000/docs)**
 
-### 2. Frontend Setup
+#### Frontend (Next.js 16 PWA):
 ```powershell
 cd frontend
 npm install
 npm run dev
 ```
-Open **[http://localhost:3000](http://localhost:3000)** in Google Chrome or Microsoft Edge.
+Open **[http://localhost:3000](http://localhost:3000)** in Chrome or Edge.
 
-### 3. Firmware Flashing & Verification
+### 3. Firmware Flashing (ESP32)
 ```powershell
-# Run the firmware cryptographic verification suite
-python firmware/test_firmware_crypto.py
-
-# Flash firmware to physical ESP32 using PlatformIO
 cd firmware/esp32_relay_node
 pio run -t upload
 pio device monitor -b 115200

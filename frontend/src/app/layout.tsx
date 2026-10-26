@@ -4,6 +4,7 @@ import "./globals.css";
 import { OfflineMeshProvider } from "@/components/OfflineMeshContext";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { PwaBanner } from "@/components/PwaBanner";
+import { Navigation } from "@/components/Navigation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,6 +53,7 @@ export default function RootLayout({
         <OfflineMeshProvider>
           <ServiceWorkerRegister />
           <PwaBanner />
+          <Navigation />
           {children}
         </OfflineMeshProvider>
       </body>
