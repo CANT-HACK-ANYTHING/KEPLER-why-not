@@ -7,73 +7,163 @@ import { DriverWalletTopupModal } from "@/components/DriverWalletTopupModal";
 import { RouteNavigationModal, NavStation } from "@/components/RouteNavigationModal";
 import { Coordinates, calculateDistanceKm, DEFAULT_DRIVER_COORDS } from "@/lib/geoUtils";
 
-interface Station extends NavStation {
+export interface Station extends NavStation {
   status: "Available" | "Charging";
   color: "mint" | "peach" | "blue" | "emerald";
-  coords: { x: number; y: number }; // Percentage coordinates on schematic vector map
+  coords: { x: number; y: number };
   hardwareNote?: string;
 }
 
 const initialStations: Station[] = [
   {
-    id: "RelayEV-Node-01",
-    name: "Mohan's Courtyard",
-    host: "Mohan Ram (Solar + PZEM)",
-    place: "Rampur village • 0.8 km",
-    power: "3.2 kW",
-    rate: 10.0,
-    status: "Available",
-    initials: "MC",
-    color: "mint",
-    latitude: 28.614,
-    longitude: 77.209,
-    coords: { x: 32, y: 44 },
-    hardwareNote: "100% Solar-powered off-grid node",
-  },
-  {
-    id: "RelayEV-Node-02",
-    name: "Kavita's Farmhouse",
-    host: "Kavita Devi (30A Relay)",
-    place: "Old highway • 2.4 km",
-    power: "2.8 kW",
-    rate: 12.0,
-    status: "Available",
-    initials: "KF",
-    color: "peach",
-    latitude: 28.618,
-    longitude: 77.215,
-    coords: { x: 68, y: 28 },
-    hardwareNote: "30A Failsafe with shaded parking",
-  },
-  {
-    id: "RelayEV-Node-03",
-    name: "Village Co-op Hub",
-    host: "Rampur Panchayat",
-    place: "Market road • 3.1 km",
-    power: "3.5 kW",
-    rate: 8.5,
+    id: "node_esp32_01",
+    name: "VIT Campus Solar Relay",
+    host: "Rajesh Kumar (VIT Solar Grid)",
+    place: "Near VIT Main Gate, Tiruvalam Road, Katpadi",
+    power: "3.3 kW",
+    rate: 10.00,
     status: "Available",
     initials: "VC",
-    color: "blue",
-    latitude: 28.611,
-    longitude: 77.202,
-    coords: { x: 48, y: 72 },
-    hardwareNote: "Subsidized community tariff",
+    color: "mint",
+    latitude: 12.9692,
+    longitude: 79.1559,
+    coords: { x: 50, y: 35 },
+    hardwareNote: "100% Rooftop solar + PZEM-004T with shaded 2W bay",
   },
   {
-    id: "RelayEV-Node-04",
-    name: "Sharma Dhaba Tap",
-    host: "Ramesh Sharma",
-    place: "NH-48 Milestone • 4.8 km",
+    id: "node_esp32_02",
+    name: "Katpadi Junction Charging Point",
+    host: "Murugan S. (Station Relay)",
+    place: "Near Katpadi Railway Station, NH-46",
     power: "3.3 kW",
-    rate: 14.0,
+    rate: 12.50,
     status: "Available",
-    initials: "SD",
+    initials: "KJ",
+    color: "blue",
+    latitude: 12.9783,
+    longitude: 79.1450,
+    coords: { x: 42, y: 28 },
+    hardwareNote: "24/7 Chai point beside station parking, 30A relay",
+  },
+  {
+    id: "node_esp32_03",
+    name: "Sripuram Golden Temple Hub",
+    host: "Lakshmi Narayani Trust",
+    place: "Malaikodi, Sripuram Temple Road",
+    power: "7.2 kW",
+    rate: 8.50,
+    status: "Available",
+    initials: "SG",
+    color: "peach",
+    latitude: 12.8998,
+    longitude: 79.1162,
+    coords: { x: 35, y: 65 },
+    hardwareNote: "Dual Type-2 Fast AC with pilgrimage visitor parking",
+  },
+  {
+    id: "node_esp32_04",
+    name: "Vellore Fort Heritage Tap",
+    host: "Kannan Heritage Cafeteria",
+    place: "Opp. Vellore Fort East Gate, Anna Salai",
+    power: "3.3 kW",
+    rate: 11.00,
+    status: "Available",
+    initials: "VF",
     color: "emerald",
-    latitude: 28.625,
-    longitude: 77.228,
-    coords: { x: 82, y: 58 },
-    hardwareNote: "24/7 Chai dhaba with high-power relay",
+    latitude: 12.9205,
+    longitude: 79.1325,
+    coords: { x: 46, y: 52 },
+    hardwareNote: "Heritage moat parking with shaded tree canopy",
+  },
+  {
+    id: "node_esp32_05",
+    name: "Bagayam Rural Clean Hub",
+    host: "Dr. Anand Green Energy",
+    place: "Near CMC Bagayam Campus, College Hill",
+    power: "3.3 kW",
+    rate: 9.50,
+    status: "Available",
+    initials: "BR",
+    color: "mint",
+    latitude: 12.8710,
+    longitude: 79.1350,
+    coords: { x: 48, y: 78 },
+    hardwareNote: "Solar battery buffer, open for public 2W/3W charging",
+  },
+  {
+    id: "node_esp32_06",
+    name: "Ranipet Industrial Corridor Relay",
+    host: "Ranipet Fleet Co-op",
+    place: "SIPCOT Phase 1, Chennai Highway, Ranipet",
+    power: "7.4 kW",
+    rate: 13.00,
+    status: "Available",
+    initials: "RI",
+    color: "blue",
+    latitude: 12.9275,
+    longitude: 79.3330,
+    coords: { x: 80, y: 48 },
+    hardwareNote: "Heavy-duty 32A industrial line for commercial cargo 3W",
+  },
+  {
+    id: "node_esp32_07",
+    name: "Ambur Leather Town Node",
+    host: "Ismail Leather Works",
+    place: "NH-48 Bypass, Near Star Biryani, Ambur",
+    power: "3.3 kW",
+    rate: 12.00,
+    status: "Available",
+    initials: "AL",
+    color: "peach",
+    latitude: 12.7905,
+    longitude: 78.7160,
+    coords: { x: 12, y: 88 },
+    hardwareNote: "Highway rest stop node with 24/7 tea & tire check",
+  },
+  {
+    id: "node_esp32_08",
+    name: "Sholinghur Hill Temple Relay",
+    host: "Govindarajan Temple Inn",
+    place: "Foot of Yoga Narasimha Swamy Hill, Sholinghur",
+    power: "3.3 kW",
+    rate: 10.50,
+    status: "Available",
+    initials: "SH",
+    color: "emerald",
+    latitude: 13.1140,
+    longitude: 79.4240,
+    coords: { x: 88, y: 15 },
+    hardwareNote: "Solar off-grid battery backed charging tap",
+  },
+  {
+    id: "node_esp32_09",
+    name: "Walajah Highway Toll Dhaba",
+    host: "Highway King Dhaba Tap",
+    place: "NH-48 Toll Plaza Corridor, Walajapet",
+    power: "7.2 kW",
+    rate: 14.00,
+    status: "Available",
+    initials: "WH",
+    color: "mint",
+    latitude: 12.9810,
+    longitude: 79.3620,
+    coords: { x: 84, y: 32 },
+    hardwareNote: "24/7 Dhaba dining with fenced overnight EV charging bay",
+  },
+  {
+    id: "node_esp32_10",
+    name: "Gudiyatham Agricultural Feeder",
+    host: "Venkatesan Agro Solar",
+    place: "Agricultural Market Yard, Gudiyatham Bypass",
+    power: "3.3 kW",
+    rate: 9.00,
+    status: "Available",
+    initials: "GA",
+    color: "blue",
+    latitude: 12.9460,
+    longitude: 78.8710,
+    coords: { x: 22, y: 45 },
+    hardwareNote: "Subsidized farm community tariff with solar canopy",
   },
 ];
 
@@ -84,8 +174,7 @@ export default function Home() {
   const [driverBalance, setDriverBalance] = useState<number>(500.0);
   const [driverCoords, setDriverCoords] = useState<Coordinates>(DEFAULT_DRIVER_COORDS);
   const [isLocating, setIsLocating] = useState<boolean>(false);
-  const [locateStatus, setLocateStatus] = useState<string>("Rampur Village (Simulated GPS)");
-  const [activeTab, setActiveTab] = useState<"map" | "grid">("map");
+  const [locateStatus, setLocateStatus] = useState<string>("Katpadi / Vellore (Active GPS)");
 
   // Filtering & Search States
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -118,18 +207,22 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         if (data.length > 0) {
-          // Merge with coordinates and display colors
-          const merged: Station[] = data.map((n: any, idx: number) => {
-            const preset = initialStations[idx % initialStations.length];
+          const merged: Station[] = data.map((n: any) => {
+            const preset = initialStations.find((s) => s.id === n.id) || initialStations[0];
             return {
               id: n.id,
               name: n.name,
               host: n.host_name,
               place: n.location,
-              power: `${n.max_power_kw} kW`,
+              power: `${n.max_power_kw || 3.3} kW`,
               rate: n.rate_per_kwh,
               status: n.is_active ? "Available" : "Charging",
-              initials: n.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+              initials: n.name
+                .split(" ")
+                .map((w: string) => w[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase(),
               color: preset.color,
               latitude: n.latitude || preset.latitude,
               longitude: n.longitude || preset.longitude,
@@ -162,7 +255,7 @@ export default function Home() {
         },
         (err) => {
           console.warn("GPS error:", err.message);
-          setLocateStatus("GPS unavailable in dead zone · Using Rampur center");
+          setLocateStatus("Katpadi / Vellore Core (Default Corridor)");
           setIsLocating(false);
         },
         { enableHighAccuracy: true, timeout: 5000 }
@@ -192,7 +285,7 @@ export default function Home() {
     if (filterType === "CHEAP") {
       result = result.filter((st) => st.rate <= 10.0);
     } else if (filterType === "FAST") {
-      result = result.filter((st) => parseFloat(st.power) >= 3.2);
+      result = result.filter((st) => parseFloat(st.power) >= 3.3);
     } else if (filterType === "NEAREST") {
       result.sort((a, b) => {
         const distA = calculateDistanceKm(driverCoords, { latitude: a.latitude, longitude: a.longitude });
@@ -220,8 +313,8 @@ export default function Home() {
   };
 
   return (
-    <main className="app-shell">
-      {/* Modals */}
+    <div className="w-full min-h-screen bg-slate-900 text-slate-100 pb-16">
+      {/* Topup & Navigation Modals */}
       <DriverWalletTopupModal
         currentBalance={driverBalance}
         isOpen={isTopupOpen}
@@ -240,635 +333,300 @@ export default function Home() {
         }}
       />
 
-      {/* Left Sidebar */}
-      <aside className="sidebar">
-        <a className="brand" href="#top" aria-label="RelayEV home">
-          <span className="brand-badge">⚡</span>
-          <span className="brand-text">
-            <strong>Relay</strong>
-            <span>EV</span>
-          </span>
-        </a>
-
-        {/* Offline Mesh Badge */}
-        <div
-          style={{
-            background: "#eef7ee",
-            border: "1px solid #d4e8d4",
-            borderRadius: "10px",
-            padding: "10px 12px",
-            margin: "12px 0 16px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "4px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#1e5343" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981" }} />
-            <strong>Offline-First Mesh Active</strong>
-          </div>
-          <span style={{ fontSize: "10px", color: "#668575" }}>
-            Cellular Dead Zone · Web Bluetooth Ready
-          </span>
-        </div>
-
-        <div className="sidebar-bottom">
-          {/* Driver Wallet Card in Sidebar */}
-          <div
-            style={{
-              background: "#edf5ed",
-              border: "1px solid #d5e5d5",
-              borderRadius: "10px",
-              padding: "14px",
-              marginBottom: "14px",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: "9px", letterSpacing: "1px", fontWeight: 700, color: "#4f7360" }}>
-                DRIVER WALLET
-              </div>
-              <button
-                onClick={() => setIsTopupOpen(true)}
-                style={{
-                  background: "#10b981",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  padding: "2px 8px",
-                  cursor: "pointer",
-                }}
-              >
-                + Top Up
-              </button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {/* Top Header / Driver Status Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs uppercase tracking-wider font-bold text-emerald-400">
+                Offline-First P2P Mesh · Bluetooth Escrow Active
+              </span>
             </div>
-            <div style={{ fontSize: "22px", fontWeight: 800, color: "#19342f", margin: "4px 0" }}>
-              ₹{driverBalance.toFixed(2)}
-            </div>
-            <div style={{ fontSize: "10px", color: "#6c8577" }}>
-              Anaya Rao (EV Driver · user_88)
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Vellore EV Mesh Network
+            </h1>
+            <p className="text-sm text-slate-400 mt-0.5">
+              10 verified decentralized charging stations operating with zero cellular SIM OPEX.
+            </p>
           </div>
 
-          <div className="help-card">
-            <span className="help-icon">✳</span>
-            <strong>Power grows<br />when we share.</strong>
-            <p>Community micro-grids empowering rural mobility with zero SIM OPEX.</p>
-            <button onClick={() => openStationDrawer(stations[0])}>
-              Start a charge <span>→</span>
-            </button>
-          </div>
-          <div className="profile">
-            <span className="avatar">AR</span>
-            <span>
-              <strong>Anaya Rao</strong>
-              <small>EV Driver · user_88</small>
-            </span>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Dashboard Area */}
-      <section className="main-area" id="top">
-        {/* Topbar */}
-        <header className="topbar">
-          <div className="breadcrumb">
-            Rampur Corridor <span>/</span> Driver Mesh Navigation
-          </div>
-          <div className="topbar-right">
-            <button
-              onClick={() => setIsTopupOpen(true)}
-              style={{
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#1e5343",
-                background: "#e4efe5",
-                padding: "6px 12px",
-                borderRadius: "20px",
-                border: "1px solid #c2dec4",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              👛 Wallet: ₹{driverBalance.toFixed(2)} <span style={{ color: "#059669" }}>+ Top Up</span>
-            </button>
+          <div className="flex items-center gap-3">
             <button
               onClick={handleLocateMe}
               disabled={isLocating}
-              style={{
-                background: "#ffffff",
-                border: "1px solid #dce6d8",
-                borderRadius: "20px",
-                padding: "6px 12px",
-                fontSize: "11px",
-                fontWeight: 600,
-                color: "#1b4d3e",
-                cursor: "pointer",
-              }}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition"
             >
-              📍 {isLocating ? "Locating GPS..." : locateStatus}
+              <span>📍</span>
+              <span>{isLocating ? "Acquiring GPS..." : locateStatus}</span>
             </button>
-            <span className="top-avatar">AR</span>
+            <Link
+              href="/map"
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-900/40 transition"
+            >
+              <span>🗺️ Hex Map (10)</span>
+              <span>↗</span>
+            </Link>
           </div>
-        </header>
+        </div>
 
-        {/* Content */}
-        <div className="content">
-          {/* Welcome Header */}
-          <div className="welcome-row">
-            <div>
-              <div className="eyebrow">
-                PEER-TO-PEER COMMUNITY CHARGING <span className="tiny-spark">✳</span>
+        {/* Driver Wallet & Mesh Quick Stats Hero */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+          {/* Driver Wallet Card */}
+          <div className="md:col-span-2 bg-gradient-to-br from-slate-800 to-slate-855 border border-slate-700/80 rounded-2xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                  DRIVER PRE-FUNDED ESCROW WALLET
+                </span>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-4xl font-black text-white">₹{driverBalance.toFixed(2)}</span>
+                  <span className="text-xs text-slate-400 font-mono">INR Available</span>
+                </div>
+                <div className="flex items-center gap-2 mt-2 text-xs text-slate-300">
+                  <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-[10px]">
+                    AR
+                  </span>
+                  <span>Anaya Rao (EV Driver · user_88)</span>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-emerald-400 font-medium">✓ Cryptographically Secured</span>
+                </div>
               </div>
-              <h1>
-                Good morning, Anaya <span className="wave">✳</span>
-              </h1>
-              <p className="intro">
-                A ₹1,500 decentralized P2P charging mesh engineered for rural India and cellular dead zones.
+
+              <button
+                onClick={() => setIsTopupOpen(true)}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>+</span>
+                <span>Top Up Wallet</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-slate-700/60 text-xs">
+              <div>
+                <span className="text-slate-400 block text-[11px]">Nodes In Range</span>
+                <span className="font-bold text-white text-sm">10 Stations</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">Macro Hex Clusters</span>
+                <span className="font-bold text-white text-sm">2 Sectors (Tier 1)</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">Simulated BLE</span>
+                <span className="font-bold text-emerald-400 text-sm">ESP32 Ready</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Connect / Map Portal Card */}
+          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-xs font-bold text-slate-400 mb-2">
+                <span>INTERACTIVE HEX MAP</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px]">
+                  10 LOCATIONS
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-white mb-1.5">
+                Full Corridor Spatial Discovery
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Leaflet map indexing Katpadi, VIT, Sripuram, Vellore Fort, Bagayam, Ranipet, Ambur, Sholinghur, Walajah, and Gudiyatham.
               </p>
             </div>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button
-                className="primary-button"
-                onClick={() => openStationDrawer(stations[0])}
+
+            <div className="mt-4 flex flex-col gap-2">
+              <Link
+                href="/map"
+                className="w-full text-center bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-2.5 rounded-xl border border-slate-600 transition flex items-center justify-center gap-2"
               >
-                <span className="bolt">ϟ</span>
-                Connect to Node #01
-                <span className="button-arrow">↗</span>
+                <span>🗺️ Open Full Hex Map</span>
+                <span>→</span>
+              </Link>
+              <button
+                onClick={() => openStationDrawer(stations[0])}
+                className="w-full text-center bg-slate-900/80 hover:bg-slate-900 text-slate-300 font-semibold text-xs py-2 rounded-xl border border-slate-700 transition"
+              >
+                ⚡ Start BLE Charge at VIT Relay
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Search & Filter Bar */}
-          <div
-            style={{
-              background: "#ffffff",
-              border: "1px solid #dce6d8",
-              borderRadius: "14px",
-              padding: "16px 20px",
-              marginBottom: "20px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "12px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-            }}
-          >
-            {/* Search Input */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: "260px" }}>
-              <span style={{ fontSize: "16px" }}>🔍</span>
-              <input
-                type="text"
-                placeholder="Search village, host (Mohan, Kavita), or landmark..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: "100%",
-                  border: "none",
-                  outline: "none",
-                  fontSize: "13px",
-                  color: "#19342f",
-                }}
-              />
-            </div>
-
-            {/* Filter Chips */}
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {[
-                { id: "ALL", label: "All Stations" },
-                { id: "CHEAP", label: "Under ₹10 🏷️" },
-                { id: "FAST", label: "3.2+ kW Fast ⚡" },
-                { id: "NEAREST", label: "Nearest First 📍" },
-              ].map((f) => {
-                const isActive = filterType === f.id;
-                return (
-                  <button
-                    key={f.id}
-                    onClick={() => setFilterType(f.id as any)}
-                    style={{
-                      background: isActive ? "#1b4d3e" : "#f1f6f1",
-                      color: isActive ? "#ffffff" : "#4e6a5c",
-                      border: isActive ? "1px solid #1b4d3e" : "1px solid #d8e5d6",
-                      borderRadius: "18px",
-                      padding: "6px 12px",
-                      fontSize: "12px",
-                      fontWeight: isActive ? 700 : 500,
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Interactive Charging Mesh Map */}
-          <section
-            style={{
-              background: "#ffffff",
-              border: "1px solid #dce6d8",
-              borderRadius: "14px",
-              padding: "20px",
-              marginBottom: "20px",
-              boxShadow: "0 4px 18px rgba(25, 52, 47, 0.05)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-              <div>
-                <div style={{ fontSize: "10px", letterSpacing: "1.2px", fontWeight: 700, color: "#618070", textTransform: "uppercase" }}>
-                  COMMUNITY MESH MAP · CELLULAR DEAD ZONE
-                </div>
-                <h3 style={{ margin: "2px 0 0", fontFamily: "Georgia, serif", fontSize: "20px", fontWeight: 600 }}>
-                  Live Rampur P2P Charging Nodes
-                </h3>
-              </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <span
-                  style={{
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    padding: "4px 10px",
-                    borderRadius: "20px",
-                    border: "1px solid #fde68a",
-                  }}
-                >
-                  📡 0 Bars (Dead Zone) · Web Bluetooth Active
-                </span>
-                <span
-                  style={{
-                    background: "#ecfdf5",
-                    color: "#065f46",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    padding: "4px 10px",
-                    borderRadius: "20px",
-                    border: "1px solid #a7f3d0",
-                  }}
-                >
-                  ⚡ {displayedStations.length} Nodes Shown
-                </span>
-              </div>
-            </div>
-
-            {/* Vector Map Canvas */}
-            <div
-              style={{
-                position: "relative",
-                height: "280px",
-                background: "radial-gradient(ellipse at 50% 50%, #e2eee0 0%, #edf4ec 60%, #f6faf5 100%)",
-                borderRadius: "12px",
-                overflow: "hidden",
-                border: "1px solid #d4e3d2",
-              }}
-            >
-              {/* Mesh Route Connections (SVG Lines) */}
-              <svg
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
-              >
-                <line x1="32%" y1="44%" x2="68%" y2="28%" stroke="#8eb899" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
-                <line x1="32%" y1="44%" x2="48%" y2="72%" stroke="#8eb899" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
-                <line x1="48%" y1="72%" x2="82%" y2="58%" stroke="#8eb899" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
-                <line x1="68%" y1="28%" x2="82%" y2="58%" stroke="#8eb899" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
-              </svg>
-
-              {/* Terrain Roadways Decoration */}
-              <div
-                style={{
-                  position: "absolute",
-                  left: "10%",
-                  top: "40%",
-                  width: "80%",
-                  height: "20px",
-                  borderTop: "2px dashed #bdd4be",
-                  transform: "rotate(-6deg)",
-                  opacity: 0.5,
-                  pointerEvents: "none",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  left: "40%",
-                  top: "10%",
-                  width: "20px",
-                  height: "80%",
-                  borderLeft: "2px dashed #bdd4be",
-                  opacity: 0.5,
-                  pointerEvents: "none",
-                }}
-              />
-
-              {/* Station Markers on Map */}
-              {displayedStations.map((st) => {
-                const distanceKm = calculateDistanceKm(driverCoords, {
-                  latitude: st.latitude,
-                  longitude: st.longitude,
-                });
-                const isSelected = selectedStation?.id === st.id;
-
-                return (
-                  <div
-                    key={st.id}
-                    style={{
-                      position: "absolute",
-                      left: `${st.coords.x}%`,
-                      top: `${st.coords.y}%`,
-                      transform: "translate(-50%, -50%)",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "4px",
-                      zIndex: isSelected ? 30 : 10,
-                    }}
-                  >
-                    <button
-                      onClick={() => openStationDrawer(st)}
-                      style={{
-                        background: isSelected ? "#1b4d3e" : "#ffffff",
-                        color: isSelected ? "#ffffff" : "#19342f",
-                        border: "2px solid #286350",
-                        borderRadius: "24px",
-                        padding: "6px 12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        cursor: "pointer",
-                        boxShadow: "0 4px 12px rgba(27, 77, 62, 0.2)",
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          background: st.status === "Available" ? "#10b981" : "#f59e0b",
-                        }}
-                      />
-                      <span style={{ fontSize: "12px", fontWeight: 700 }}>{st.name}</span>
-                      <span style={{ fontSize: "10px", opacity: 0.8 }}>₹{st.rate}/kWh</span>
-                    </button>
-
-                    {/* Quick Navigate Pin Tag */}
-                    <button
-                      onClick={(e) => openRouteModal(st, e)}
-                      style={{
-                        background: "#2563eb",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: "10px",
-                        padding: "2px 8px",
-                        fontSize: "9px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        boxShadow: "0 2px 6px rgba(37,99,235,0.3)",
-                      }}
-                    >
-                      🚗 {distanceKm} km
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Station Cards Grid */}
-          <div className="section-header">
-            <div>
-              <span className="section-eyebrow">STATIONS READY FOR CHARGING</span>
-              <h2>Available Community Nodes ({displayedStations.length})</h2>
-            </div>
-            <span style={{ fontSize: "12px", color: "#618070" }}>
-              Click station to pair over Web Bluetooth or navigate
+        {/* Station Search & Filter Toolbar */}
+        <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 mb-6 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="relative w-full md:w-96">
+            <span className="absolute inset-y-0 left-3 flex items-center text-slate-400 text-sm">
+              🔍
             </span>
+            <input
+              type="text"
+              placeholder="Search by place (VIT, Katpadi, Sripuram, Fort, Ranipet, Ambur)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 text-white placeholder-slate-500 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-emerald-500 transition"
+            />
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: "16px",
-              marginBottom: "32px",
-            }}
-          >
-            {displayedStations.map((st) => {
-              const distanceKm = calculateDistanceKm(driverCoords, {
-                latitude: st.latitude,
-                longitude: st.longitude,
-              });
-
+          <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+            {[
+              { id: "ALL", label: `All (${stations.length})` },
+              { id: "CHEAP", label: "Under ₹10 🏷️" },
+              { id: "FAST", label: "Fast (3.3+ kW) ⚡" },
+              { id: "NEAREST", label: "Nearest First 📍" },
+            ].map((f) => {
+              const isActive = filterType === f.id;
               return (
-                <div
-                  key={st.id}
-                  onClick={() => openStationDrawer(st)}
-                  style={{
-                    background: "#ffffff",
-                    border: "1px solid #dce6d8",
-                    borderRadius: "14px",
-                    padding: "18px",
-                    cursor: "pointer",
-                    boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
-                    transition: "transform 0.15s ease, box-shadow 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.08)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.03)";
-                  }}
+                <button
+                  key={f.id}
+                  onClick={() => setFilterType(f.id as any)}
+                  className={`text-xs px-3.5 py-1.5 rounded-xl font-bold transition ${
+                    isActive
+                      ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                      : "bg-slate-900/80 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                  }`}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                      <span
-                        style={{
-                          width: "36px",
-                          height: "36px",
-                          borderRadius: "10px",
-                          background: "#e4efe5",
-                          color: "#1b4d3e",
-                          display: "grid",
-                          placeItems: "center",
-                          fontWeight: 800,
-                          fontSize: "13px",
-                        }}
-                      >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Station Feed Section Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>Verified Charging Stations</span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-slate-700 font-mono">
+                {displayedStations.length} available
+              </span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Click any station to connect over Web Bluetooth or get turn-by-turn navigation.
+            </p>
+          </div>
+        </div>
+
+        {/* Station Grid (10 Real Vellore Locations) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {displayedStations.map((st) => {
+            const distanceKm = calculateDistanceKm(driverCoords, {
+              latitude: st.latitude,
+              longitude: st.longitude,
+            });
+
+            return (
+              <div
+                key={st.id}
+                onClick={() => openStationDrawer(st)}
+                className="bg-slate-800/70 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-5 shadow-lg transition duration-200 cursor-pointer flex flex-col justify-between group"
+              >
+                <div>
+                  {/* Card Header: Node ID & Status */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-slate-700/80 border border-slate-600 text-emerald-400 flex items-center justify-center font-black text-sm group-hover:scale-105 transition">
                         {st.initials}
-                      </span>
+                      </div>
                       <div>
-                        <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#19342f" }}>
+                        <h3 className="font-bold text-white text-sm group-hover:text-emerald-300 transition">
                           {st.name}
-                        </h4>
-                        <div style={{ fontSize: "11px", color: "#618070" }}>{st.host}</div>
+                        </h3>
+                        <p className="text-xs text-slate-400 line-clamp-1">{st.host}</p>
                       </div>
                     </div>
+
                     <span
-                      style={{
-                        background: "#ecfdf5",
-                        color: "#065f46",
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        padding: "3px 8px",
-                        borderRadius: "12px",
-                      }}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                        st.status === "Available"
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                      }`}
                     >
                       {st.status}
                     </span>
                   </div>
 
-                  <div style={{ fontSize: "12px", color: "#4f7360", marginBottom: "8px" }}>
-                    📍 {st.place}
+                  {/* Location Address */}
+                  <div className="flex items-start gap-1.5 text-xs text-slate-300 mb-2">
+                    <span className="text-slate-400 shrink-0">📍</span>
+                    <span className="line-clamp-2">{st.place}</span>
                   </div>
 
+                  {/* Hardware / Energy Note */}
                   {st.hardwareNote && (
-                    <div style={{ fontSize: "11px", color: "#6c8577", fontStyle: "italic", marginBottom: "12px" }}>
-                      ✓ {st.hardwareNote}
+                    <div className="text-[11px] text-slate-400 bg-slate-900/60 rounded-lg px-2.5 py-1.5 border border-slate-800 mb-4 line-clamp-2">
+                      <span className="text-emerald-400 font-semibold">✓ </span>
+                      {st.hardwareNote}
                     </div>
                   )}
+                </div>
 
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #edf4ec", paddingTop: "12px" }}>
+                <div>
+                  {/* Tariff & Power Strip */}
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-700/60 mb-3 text-xs">
                     <div>
-                      <span style={{ fontSize: "18px", fontWeight: 800, color: "#19342f" }}>
-                        ₹{st.rate.toFixed(2)}
-                      </span>
-                      <span style={{ fontSize: "11px", color: "#618070" }}> / kWh</span>
+                      <span className="text-lg font-black text-white">₹{st.rate.toFixed(2)}</span>
+                      <span className="text-slate-400 text-[11px]"> / kWh</span>
                     </div>
 
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <button
-                        onClick={(e) => openRouteModal(st, e)}
-                        style={{
-                          background: "#eff6ff",
-                          color: "#2563eb",
-                          border: "1px solid #bfdbfe",
-                          borderRadius: "8px",
-                          padding: "6px 10px",
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
+                    <div className="flex items-center gap-2">
+                      <span className="bg-slate-900 text-slate-300 font-mono text-[11px] px-2 py-0.5 rounded border border-slate-700">
+                        ⚡ {st.power}
+                      </span>
+                      <span className="bg-blue-500/15 text-blue-400 font-mono text-[11px] px-2 py-0.5 rounded border border-blue-500/30">
                         🚗 {distanceKm} km
-                      </button>
-                      <button
-                        onClick={() => openStationDrawer(st)}
-                        style={{
-                          background: "#1b4d3e",
-                          color: "#ffffff",
-                          border: "none",
-                          borderRadius: "8px",
-                          padding: "6px 12px",
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Charge ϟ
-                      </button>
+                      </span>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
 
-      {/* Slide-out Station Drawer */}
+                  {/* Actions: Navigate + Charge */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={(e) => openRouteModal(st, e)}
+                      className="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs py-2 rounded-xl transition flex items-center justify-center gap-1"
+                    >
+                      <span>📍 Navigate</span>
+                    </button>
+                    <button
+                      onClick={() => openStationDrawer(st)}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 rounded-xl shadow-md shadow-emerald-900/30 transition flex items-center justify-center gap-1"
+                    >
+                      <span>Charge ⚡</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Slide-out Charging Drawer Overlay */}
       {selectedStation && (
         <div
-          className="drawer-overlay"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end"
           onClick={closeStationDrawer}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.45)",
-            backdropFilter: "blur(3px)",
-            zIndex: 99,
-            display: "flex",
-            justifyContent: "flex-end",
-            animation: "fadeIn 0.2s ease",
-          }}
         >
           <div
-            className="drawer-panel"
+            className="w-full max-w-lg h-full bg-slate-900 border-l border-slate-800 p-6 overflow-y-auto flex flex-col shadow-2xl animate-slide-in"
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: "480px",
-              height: "100%",
-              background: "#ffffff",
-              padding: "24px",
-              overflowY: "auto",
-              boxShadow: "-8px 0 24px rgba(0,0,0,0.15)",
-              animation: "slideInRight 0.25s ease",
-              display: "flex",
-              flexDirection: "column",
-            }}
           >
             {/* Drawer Header */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                borderBottom: "1px solid #eef2ed",
-                paddingBottom: "16px",
-                marginBottom: "20px",
-              }}
-            >
+            <div className="flex items-start justify-between border-b border-slate-800 pb-4 mb-4">
               <div>
-                <span
-                  style={{
-                    background: "#e4efe5",
-                    color: "#1e5343",
-                    padding: "3px 8px",
-                    borderRadius: "12px",
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                  }}
-                >
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">
                   {selectedStation.id}
                 </span>
-                <h2
-                  style={{
-                    margin: "6px 0 2px",
-                    fontFamily: "Georgia, serif",
-                    fontSize: "22px",
-                    fontWeight: 700,
-                    color: "#19342f",
-                  }}
-                >
-                  {selectedStation.name}
-                </h2>
-                <div style={{ fontSize: "12px", color: "#618070" }}>
+                <h2 className="text-xl font-black text-white mt-2">{selectedStation.name}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
                   Hosted by {selectedStation.host} • 📍 {selectedStation.place}
-                </div>
+                </p>
               </div>
               <button
                 onClick={closeStationDrawer}
-                style={{
-                  background: "#f0f4f0",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: "32px",
-                  height: "32px",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "grid",
-                  placeItems: "center",
-                }}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm transition"
               >
                 ✕
               </button>
@@ -885,18 +643,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* Drawer Animations */}
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideInRight {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-      `}</style>
-    </main>
+    </div>
   );
 }

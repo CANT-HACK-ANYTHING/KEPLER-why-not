@@ -121,10 +121,16 @@ def init_database():
     if cursor.fetchone()[0] == 0:
         now = datetime.now(timezone.utc).isoformat()
         seed_nodes = [
-            ("RelayEV-Node-01", "Mohan's Courtyard Node", "Mohan Ram", "host_mohan", "Rampur Village, Plot 4", 28.6140, 77.2090, 10.00, 3.30, 0.00, settings.NODE_SIGNATURE_KEY, now),
-            ("RelayEV-Node-02", "Kavita's Farmhouse Node", "Kavita Devi", None, "Old Highway Jn, Rampur", 28.6180, 77.2150, 12.00, 2.80, 0.00, settings.NODE_SIGNATURE_KEY, now),
-            ("RelayEV-Node-03", "Village Co-op Charging Hub", "Rampur Panchayat", None, "Market Road, Rampur", 28.6110, 77.2020, 8.50, 3.50, 0.00, settings.NODE_SIGNATURE_KEY, now),
-            ("RelayEV-Node-04", "Sharma Dhaba Fast Tap", "Ramesh Sharma", None, "NH-48 Milestone 42", 28.6250, 77.2280, 14.00, 3.30, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_01", "VIT Campus Solar Relay", "Rajesh Kumar", "host_rajesh", "Near VIT Main Gate, Tiruvalam Road, Katpadi", 12.9692, 79.1559, 10.00, 3.30, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_02", "Katpadi Junction Charging Point", "Murugan S.", "host_murugan", "Near Katpadi Railway Station, NH-46", 12.9783, 79.1450, 12.50, 3.30, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_03", "Sripuram Golden Temple Hub", "Lakshmi Narayani Trust", "host_sripuram", "Malaikodi, Sripuram Temple Road", 12.8998, 79.1162, 8.50, 7.20, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_04", "Vellore Fort Heritage Tap", "Kannan Heritage Cafeteria", "host_kannan", "Opp. Vellore Fort East Gate, Anna Salai", 12.9205, 79.1325, 11.00, 3.30, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_05", "Bagayam Rural Clean Hub", "Dr. Anand Green Energy", "host_anand", "Near CMC Bagayam Campus, College Hill", 12.8710, 79.1350, 9.50, 3.30, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_06", "Ranipet Industrial Corridor Relay", "Ranipet Fleet Co-op", "host_ranipet", "SIPCOT Phase 1, Chennai Highway, Ranipet", 12.9275, 79.3330, 13.00, 7.40, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_07", "Ambur Leather Town Node", "Ismail Leather Works", "host_ismail", "NH-48 Bypass, Near Star Biryani, Ambur", 12.7905, 78.7160, 12.00, 3.30, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_08", "Sholinghur Hill Temple Relay", "Govindarajan Temple Inn", "host_govind", "Foot of Yoga Narasimha Swamy Hill, Sholinghur", 13.1140, 79.4240, 10.50, 3.30, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_09", "Walajah Highway Toll Dhaba", "Highway King Dhaba Tap", "host_walajah", "NH-48 Toll Plaza Corridor, Walajapet", 12.9810, 79.3620, 14.00, 7.20, 0.00, settings.NODE_SIGNATURE_KEY, now),
+            ("node_esp32_10", "Gudiyatham Agricultural Feeder", "Venkatesan Agro Solar", "host_gudiyatham", "Agricultural Market Yard, Gudiyatham Bypass", 12.9460, 78.8710, 9.00, 3.30, 0.00, settings.NODE_SIGNATURE_KEY, now),
         ]
         cursor.executemany("""
         INSERT INTO nodes (id, name, host_name, host_user_id, location, latitude, longitude, rate_per_kwh, max_power_kw, host_wallet_balance, hardware_secret, created_at)

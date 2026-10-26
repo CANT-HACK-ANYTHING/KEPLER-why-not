@@ -51,9 +51,9 @@ export function getGoogleMapsNavigationUrl(
 }
 
 /**
- * Default fallback coordinates: Rampur Village Corridor, Haryana / Delhi NCR
+ * Default fallback coordinates: Vellore Central / VIT Campus, Tamil Nadu
  */
 export const DEFAULT_DRIVER_COORDS: Coordinates = {
-  latitude: 28.614,
-  longitude: 77.209,
+  latitude: 12.9692,
+  longitude: 79.1559,
 };

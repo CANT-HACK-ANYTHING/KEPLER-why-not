@@ -24,29 +24,33 @@ export const MACRO_HEX_SECTORS: MacroHexSector[] = [
   {
     id: 'macro_sector_vlr_central',
     code: 'HEX-MACRO-VLR01',
-    name: 'Vellore Central Macro Sector',
-    centerLat: 12.9450,
-    centerLng: 79.1380,
-    radiusKm: 9.8,
+    name: 'Vellore Urban & Educational Core',
+    centerLat: 12.9250,
+    centerLng: 79.1350,
+    radiusKm: 12.0,
     color: '#06b6d4', // Cyan
     stationIds: [
       'node_esp32_01', // VIT Campus Solar Relay
       'node_esp32_02', // Katpadi Junction Charging Point
       'node_esp32_03', // Sripuram Golden Temple Hub
+      'node_esp32_04', // Vellore Fort Heritage Tap
+      'node_esp32_05', // Bagayam Rural Clean Hub
     ],
   },
   {
     id: 'macro_sector_vlr_corridor',
     code: 'HEX-MACRO-CORRIDOR02',
-    name: 'Highway Outer Macro Corridor',
-    centerLat: 12.8750,
+    name: 'Highway & Rural Feeder Corridor',
+    centerLat: 12.9400,
     centerLng: 79.1500,
-    radiusKm: 22.0,
+    radiusKm: 55.0,
     color: '#8b5cf6', // Violet
     stationIds: [
-      'node_esp32_04', // Ranipet Highway Dhaba Relay
-      'node_esp32_05', // Ambur Leather Town Node
-      'node_esp32_06', // Sholinghur Hill Temple Relay
+      'node_esp32_06', // Ranipet Industrial Corridor Relay
+      'node_esp32_07', // Ambur Leather Town Node
+      'node_esp32_08', // Sholinghur Hill Temple Relay
+      'node_esp32_09', // Walajah Highway Toll Dhaba
+      'node_esp32_10', // Gudiyatham Agricultural Feeder
     ],
   },
 ];
