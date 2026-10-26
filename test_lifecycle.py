@@ -3,6 +3,7 @@ import json
 import hmac
 import hashlib
 import time
+import uuid
 
 BASE_URL = "http://127.0.0.1:8000"
 SECRET_KEY = "relay_ev_hardware_master_secret_2026"
@@ -59,7 +60,7 @@ stop_res = post("/api/charge/stop", {
     "actual_cost": actual_cost,
     "node_signature": node_signature,
     "timestamp": int(time.time()),
-    "nonce": "test_nonce_99"
+    "nonce": f"test_nonce_{int(time.time())}_{uuid.uuid4().hex[:6]}"
 })
 assert stop_res["signature_verified"] is True, "Signature must be verified!"
 assert stop_res["refund_amount"] == 15.80, f"Expected refund 15.80, got {stop_res['refund_amount']}"

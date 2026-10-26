@@ -94,8 +94,13 @@ ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wallet_audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Permissive public read access for community mesh participants
+DROP POLICY IF EXISTS "Public read nodes" ON nodes;
 CREATE POLICY "Public read nodes" ON nodes FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public read user profiles" ON users;
 CREATE POLICY "Public read user profiles" ON users FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public read transactions" ON transactions;
 CREATE POLICY "Public read transactions" ON transactions FOR SELECT USING (true);
 
 -- Seed Initial Sprint Users
@@ -109,8 +114,8 @@ ON CONFLICT (id) DO NOTHING;
 -- Seed Initial Sprint Charging Nodes
 INSERT INTO nodes (id, name, host_name, host_user_id, location, latitude, longitude, rate_per_kwh, max_power_kw, host_wallet_balance, hardware_secret)
 VALUES
-    ('RelayEV-Node-01', 'Mohan’s Courtyard Node', 'Mohan Ram', 'host_mohan', 'Rampur Village, Plot 4', 28.6140, 77.2090, 10.00, 3.30, 0.00, 'relay_ev_hardware_master_secret_2026'),
-    ('RelayEV-Node-02', 'Kavita’s Farmhouse Node', 'Kavita Devi', NULL, 'Old Highway Jn, Rampur', 28.6180, 77.2150, 12.00, 2.80, 0.00, 'relay_ev_hardware_master_secret_2026'),
+    ('RelayEV-Node-01', 'Mohan''s Courtyard Node', 'Mohan Ram', 'host_mohan', 'Rampur Village, Plot 4', 28.6140, 77.2090, 10.00, 3.30, 0.00, 'relay_ev_hardware_master_secret_2026'),
+    ('RelayEV-Node-02', 'Kavita''s Farmhouse Node', 'Kavita Devi', NULL, 'Old Highway Jn, Rampur', 28.6180, 77.2150, 12.00, 2.80, 0.00, 'relay_ev_hardware_master_secret_2026'),
     ('RelayEV-Node-03', 'Village Co-op Charging Hub', 'Rampur Panchayat', NULL, 'Market Road, Rampur', 28.6110, 77.2020, 8.50, 3.50, 0.00, 'relay_ev_hardware_master_secret_2026'),
     ('RelayEV-Node-04', 'Sharma Dhaba Fast Tap', 'Ramesh Sharma', NULL, 'NH-48 Milestone 42', 28.6250, 77.2280, 14.00, 3.30, 0.00, 'relay_ev_hardware_master_secret_2026')
 ON CONFLICT (id) DO NOTHING;

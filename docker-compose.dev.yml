@@ -1,0 +1,39 @@
+# ==============================================================================
+# RelayEV Cloud Stack - Local Development Docker Compose (Hot Reloading)
+# Run with: docker compose -f docker-compose.dev.yml up
+# ==============================================================================
+version: "3.8"
+
+services:
+  backend-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: relayev-backend-dev
+    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - SECRET_KEY=relay_ev_hardware_master_secret_2026
+      - ALGORITHM=HS256
+      - ALLOWED_ORIGINS=*
+
+  frontend-dev:
+    image: node:20-alpine
+    container_name: relayev-frontend-dev
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    command: ["npm", "run", "dev"]
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend-dev

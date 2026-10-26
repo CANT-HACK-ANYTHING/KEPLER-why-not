@@ -1,0 +1,113 @@
+# ==============================================================================
+# RelayEV Cloud Stack - Production Docker Compose
+# Single-command deployment: docker compose up -d --build
+# ==============================================================================
+version: "3.8"
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. FastAPI Cryptographic Backend Engine
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: relayev-backend
+    restart: unless-stopped
+    environment:
+      - PORT=8000
+      - SECRET_KEY=${SECRET_KEY:-relay_ev_hardware_master_secret_2026}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ESCROW_TOKEN_EXPIRE_MINUTES=${ESCROW_TOKEN_EXPIRE_MINUTES:-120}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_KEY=${SUPABASE_KEY:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+    volumes:
+      - relayev-backend-data:/app/data
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - relayev-net
+
+  # ----------------------------------------------------------------------------
+  # 2. Next.js 16 Web Bluetooth Frontend
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: relayev-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+    expose:
+      - "3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - relayev-net
+
+  # ----------------------------------------------------------------------------
+  # 3. Nginx High-Performance Reverse Proxy & Edge Router
+  # ----------------------------------------------------------------------------
+  proxy:
+    image: nginx:alpine
+    container_name: relayev-proxy
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - relayev-net
+
+  # ----------------------------------------------------------------------------
+  # 4. (Optional) Dedicated PostgreSQL Database for Self-Hosted Deployments
+  # Run with: docker compose --profile with-postgres up -d
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: relayev-postgres
+    profiles:
+      - with-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-relayev}
+      - POSTGRES_USER=${POSTGRES_USER:-relayev_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-relayev_master_pw_2026}
+    volumes:
+      - relayev-pgdata:/var/lib/postgresql/data
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - relayev-net
+
+volumes:
+  relayev-backend-data:
+    driver: local
+  relayev-pgdata:
+    driver: local
+
+networks:
+  relayev-net:
+    driver: bridge

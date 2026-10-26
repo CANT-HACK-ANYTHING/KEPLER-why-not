@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+.env
+.env.local
+relay_ev.db
+relay_ev.db-shm
+relay_ev.db-wal
+.git/
+.gitignore
+README.md
