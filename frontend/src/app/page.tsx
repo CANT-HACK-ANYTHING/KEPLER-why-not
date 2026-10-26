@@ -429,7 +429,7 @@ export default function Home() {
         {/* Driver Wallet & Mesh Quick Stats Hero */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
           {/* Driver Wallet Card */}
-          <div className="md:col-span-2 bg-gradient-to-br from-slate-800 to-slate-855 border border-slate-700/80 rounded-2xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between">
+          <div className="md:col-span-2 bg-gradient-to-br from-slate-800 to-slate-850 border border-slate-700/80 rounded-2xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between">
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">

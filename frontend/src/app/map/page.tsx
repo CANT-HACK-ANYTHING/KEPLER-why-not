@@ -768,9 +768,7 @@ export default function DiscoveryMapPage() {
               </button>
               <button
                 onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.location.href = `/charge?nodeId=${handoffPayload.nodeId}`;
-                  }
+                  alert(`Handoff parameters saved for Node ${handoffPayload.nodeId}. Ready for Person 2 Escrow & Person 3 BLE.`);
                   setHandoffPayload(null);
                 }}
                 className="flex-1 py-3 px-4 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-neutral-950 flex items-center justify-center gap-1.5 transition-colors shadow-lg shadow-emerald-500/20"
