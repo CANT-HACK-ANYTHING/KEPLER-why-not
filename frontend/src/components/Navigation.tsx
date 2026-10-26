@@ -11,6 +11,7 @@ export function Navigation() {
     { label: "Overview", href: "/", icon: "📋" },
     { label: "Mesh Map", href: "/map", icon: "🗺️" },
     { label: "Charger", href: "/charge", icon: "⚡" },
+    { label: "Escrow Settle", href: "/settle", icon: "🛡️" },
     { label: "Host Dashboard", href: "/host", icon: "📊" },
     { label: "Data Mule", href: "/mule", icon: "🚗" },
   ];

@@ -43,14 +43,24 @@ def create_escrow_jwt(
 def decode_and_verify_escrow_jwt(token: str) -> Dict[str, Any]:
     """
     Decodes and validates the cryptographic JWT escrow token.
+    Supports primary secret and Person 2 offline mesh key.
     Raises jwt.PyJWTError on invalid or expired token.
     """
-    return jwt.decode(
-        token,
-        settings.SECRET_KEY,
-        algorithms=[settings.ALGORITHM],
-        options={"require": ["exp", "iat", "sub"]}
-    )
+    try:
+        return jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"require": ["exp", "iat", "sub"]}
+        )
+    except jwt.InvalidSignatureError:
+        alt_key = "relayev_super_secret_offline_mesh_key_2026"
+        return jwt.decode(
+            token,
+            alt_key,
+            algorithms=[settings.ALGORITHM],
+            options={"require": ["exp", "iat", "sub"]}
+        )
 
 def compute_node_hmac(session_id: str, energy_kwh: float, cost: float, secret_key: str) -> str:
     """

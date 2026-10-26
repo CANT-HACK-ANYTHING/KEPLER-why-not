@@ -82,6 +82,7 @@ def root():
         "redoc_url": "/redoc"
     }
 
+@app.get("/health", response_model=HealthCheckResponse, tags=["System"])
 @app.get("/api/health", response_model=HealthCheckResponse, tags=["System"])
 def health_check():
     stats = DatabaseManager.get_system_stats()

@@ -10,6 +10,7 @@ export interface ChargingNode {
   max_power_kw: number;
   status: NodeStatus;
   address?: string;
+  address_reference?: string;
   host_name?: string;
   description?: string;
   last_ping?: string;
