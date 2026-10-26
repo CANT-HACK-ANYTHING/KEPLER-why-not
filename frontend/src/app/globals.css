@@ -1,4 +1,23 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* Mobile Safe Area Inset Helpers */
+.safe-area-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+
+.safe-area-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Ensure custom Leaflet div icons don't have default white square box */
+.leaflet-div-icon,
+.custom-ev-marker,
+.user-loc-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
 
 :root { --ink:#19342f; --muted:#788781; --green:#245f4e; --paper:#f5f7f2; --line:#e8ece5; }
 * { box-sizing:border-box; }

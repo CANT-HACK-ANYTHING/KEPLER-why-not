@@ -1,10 +1,20 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChargingSessionManager } from "@/components/ChargingSessionManager";
 
 export default function ChargePage() {
+  const [nodeId, setNodeId] = useState("mohan_courtyard_01");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const qNode = params.get("nodeId") || params.get("node");
+      if (qNode) setNodeId(qNode);
+    }
+  }, []);
+
   return (
     <main style={{ minHeight: "100vh", background: "#f5f7f2", padding: "40px 20px" }}>
       <div style={{ maxWidth: "800px", margin: "0 auto" }}>
@@ -12,7 +22,7 @@ export default function ChargePage() {
         {/* Navigation Bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
           <Link
-            href="/"
+            href="/map"
             style={{
               textDecoration: "none",
               color: "#245f4e",
@@ -23,7 +33,7 @@ export default function ChargePage() {
               gap: "6px"
             }}
           >
-            ← Back to Rampur Community Overview
+            ← Back to Interactive Mesh Map
           </Link>
 
           <span style={{
@@ -38,7 +48,7 @@ export default function ChargePage() {
         </div>
 
         {/* Embedded Charging Session Manager */}
-        <ChargingSessionManager initialNodeId="mohan_courtyard_01" />
+        <ChargingSessionManager initialNodeId={nodeId} />
 
         {/* Explanatory Architecture Card for Hackathon Judges & Beginners */}
         <div style={{

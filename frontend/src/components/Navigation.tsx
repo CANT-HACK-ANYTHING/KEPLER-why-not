@@ -8,7 +8,8 @@ export function Navigation() {
   const pathname = usePathname();
 
   const navItems = [
-    { label: "Mesh Map", href: "/", icon: "🗺️" },
+    { label: "Overview", href: "/", icon: "📋" },
+    { label: "Mesh Map", href: "/map", icon: "🗺️" },
     { label: "Charger", href: "/charge", icon: "⚡" },
     { label: "Host Dashboard", href: "/host", icon: "📊" },
     { label: "Data Mule", href: "/mule", icon: "🚗" },
