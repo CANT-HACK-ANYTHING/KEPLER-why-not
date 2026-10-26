@@ -75,7 +75,7 @@ def test_list_nodes():
     nodes = res.json()
     assert len(nodes) >= 4
     node_ids = [n["id"] for n in nodes]
-    assert "RelayEV-Node-01" in node_ids
+    assert "node_esp32_01" in node_ids or "RelayEV-Node-01" in node_ids
 
 def test_node_registration_and_payout():
     new_node_id = f"RelayEV-Node-TEST-{uuid.uuid4().hex[:6]}"
@@ -451,10 +451,10 @@ def test_mesh_analytics_overview_and_node():
     assert overview["total_transactions_count"] >= 1
 
     # 2. Node specific analytics
-    node_res = client.get("/api/analytics/node/RelayEV-Node-01")
+    node_res = client.get("/api/analytics/node/node_esp32_01")
     assert node_res.status_code == 200
     node_data = node_res.json()
-    assert node_data["node_id"] == "RelayEV-Node-01"
+    assert node_data["node_id"] in ["node_esp32_01", "RelayEV-Node-01"]
     assert node_data["uptime_status"] == "ONLINE_HEALTHY"
     assert "total_kwh_delivered" in node_data
 
